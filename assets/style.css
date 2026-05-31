@@ -77,3 +77,24 @@ tbody tr:hover{background:#eef2ff}
 .empty{text-align:center;color:#94a3b8;padding:60px 20px}
 .note{font-size:12px;color:#64748b;line-height:1.7;margin-top:18px;padding:14px;background:#fff;border-radius:12px;border:1px solid rgba(99,102,241,.08)}
 .note b{color:#b45309}
+
+/* 卡片可點提示 */
+.card{cursor:pointer}
+.card-hint{margin-top:10px;text-align:right;font-size:12px;color:#a5b4fc}
+.badge.topic{background:#fef3c7;color:#b45309}
+tbody tr{cursor:pointer}
+
+/* 詳情彈窗 */
+.modal{position:fixed;inset:0;background:rgba(30,41,59,.5);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:40px 16px;overflow-y:auto}
+.modal.show{display:flex}
+.modal-card{background:#fff;border-radius:18px;padding:22px;max-width:600px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:pop .15s ease}
+@keyframes pop{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.m-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.m-name{font-size:20px;font-weight:700}
+.m-px{font-size:22px;font-weight:700;margin-top:4px;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px}
+.m-close{background:#f1f5f9;border:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:#64748b}
+.m-close:hover{background:#e2e8f0}
+.m-section{font-size:13px;font-weight:600;color:#4f46e5;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #eef2ff}
+.spark{width:100%;height:170px;display:block}
+.spark-cap{display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:2px;font-family:'JetBrains Mono',monospace}
+.m-reason{margin-top:12px}

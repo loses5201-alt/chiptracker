@@ -1,14 +1,15 @@
 {
- "updated_at": "2026-05-31T13:50:00+08:00",
+ "updated_at": "2026-05-31T14:13:21+08:00",
  "trading_date": "20260529",
- "universe": 1135,
+ "universe": 80,
  "shown": 40,
  "sources": {
   "twse": true,
   "tpex": false,
   "broker": false,
   "fundamentals": true,
-  "overseas": true
+  "overseas": true,
+  "history": true
  },
  "topic_momentum": {
   "記憶體": 23.84,
@@ -16,5 +17,5 @@
   "CoWoS封裝": 2.78,
   "蘋果供應鏈": 2.32
  },
- "history_days": 1
+ "yahoo_ok": 80
 }
