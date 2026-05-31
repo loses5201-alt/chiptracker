@@ -2,8 +2,8 @@
 ChipTracker 主程式 — 在 GitHub Actions 上每交易日收盤後執行。
 
 兩階段流程(兼顧正確與速度):
-  階段1:抓籌碼/基本面/海外 → 算 s1~s4(不需歷史)→ 初步排序取候選股。
-  階段2:只對候選股用 Yahoo 回補近 3 月歷史 → 算 s5 技術動能 → 最終 top 40。
+  階段1:抓籌碼/基本面/海外/新聞 → 算 s1~s5(不需個股歷史)→ 取候選股。
+  階段2:只對候選股用 Yahoo 回補近 3 月歷史 → 算 s6 技術動能 → 最終 top 40。
 前端只讀產出的靜態 JSON。
 
 執行:python -m fetcher.build   (於 repo 根目錄)
@@ -19,15 +19,16 @@ from .sources.tpex import TpexSource
 from .sources.broker import BrokerSource
 from .sources.fundamentals import FundamentalsSource
 from .sources.overseas import OverseasSource
+from .sources.news import NewsSource
 from .sources.price_history import PriceHistorySource
 from . import sectors, scoring
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-TOP_N = 40           # 最終放進儀表板的檔數
-CANDIDATES = 80      # 階段1取多少檔進階段2回補歷史(>TOP_N 留緩衝)
+TOP_N = 40
+CANDIDATES = 80
 HISTORY_CAP = 60
-CHART_DAYS = 30      # stocks.json 每檔附幾日收盤供前端畫圖
+CHART_DAYS = 30
 TPE = timezone(timedelta(hours=8))
 
 
@@ -48,7 +49,6 @@ def load_history() -> dict:
 
 
 def update_history(hist: dict, trading_date: str, quotes: dict) -> dict:
-    """每日累積當日收盤+量(Yahoo 失敗時的備援);同交易日重跑不重複。"""
     if trading_date and trading_date == hist.get("last_date"):
         return hist
     closes, vols = hist["closes"], hist["vols"]
@@ -70,27 +70,28 @@ def fmt_lots(shares: float) -> str:
     return f"{lots/10000:.1f}萬張" if abs(lots) >= 10000 else f"{lots:,.0f}張"
 
 
-def base_scores(q, inst, mg, fund, topic, tmom) -> dict:
-    """階段1:算不需歷史的 s1~s4 與理由。"""
+def base_scores(q, inst, mg, fund, topic, tmom, heat) -> dict:
+    """階段1:算不需個股歷史的 s1~s5 與理由。"""
     volume = q.get("volume", 0)
     s1, n1 = scoring.score_institutional(inst, volume)
     s2, n2 = scoring.score_margin_short(mg, inst)
     s3, n3 = scoring.score_fundamental(fund)
     s4, n4 = scoring.score_overseas(topic, tmom)
+    s5, n5 = scoring.score_topic_news(topic, heat)
     return {
-        "s1": s1, "s2": s2, "s3": s3, "s4": s4,
-        "base": s1 + s2 + s3 + s4,
-        "notes": [n for n in (n1, n2, n3, n4) if n],
+        "s1": s1, "s2": s2, "s3": s3, "s4": s4, "s5": s5,
+        "base": s1 + s2 + s3 + s4 + s5,
+        "notes": [n for n in (n1, n2, n3, n4, n5) if n],
     }
 
 
-def finalize(code, q, inst, fund, topic, tmom, bs, closes, vols) -> dict:
-    """階段2:補 s5 技術動能,組成前端要的完整記錄。"""
+def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols) -> dict:
+    """階段2:補 s6 技術動能,組成前端要的完整記錄。"""
     volume = q.get("volume", 0)
     avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
-    s5, rsi, pos, n5 = scoring.score_momentum(closes, volume, avg_vol)
-    total = bs["base"] + s5
-    reasons = (bs["notes"] + ([n5] if n5 else []))[:4]
+    s6, rsi, pos, n6 = scoring.score_momentum(closes, volume, avg_vol)
+    total = bs["base"] + s6
+    reasons = (bs["notes"] + ([n6] if n6 else []))[:4]
     close = q.get("close", 0)
 
     smart = []
@@ -102,10 +103,12 @@ def finalize(code, q, inst, fund, topic, tmom, bs, closes, vols) -> dict:
     return {
         "c": code, "n": q.get("name", ""), "topic": topic or "—",
         "rec": scoring.grade(total), "score": total,
-        "s1": bs["s1"], "s2": bs["s2"], "s3": bs["s3"], "s4": bs["s4"], "s5": s5,
+        "s1": bs["s1"], "s2": bs["s2"], "s3": bs["s3"], "s4": bs["s4"], "s5": bs["s5"], "s6": s6,
         "pos": pos if pos is not None else 50,
         "yoy": round(fund["yoy"], 1) if fund else None,
         "ov": round(tmom, 1) if topic else None,
+        "heat": heat_data.get("heat", 0) if topic else 0,
+        "news": heat_data.get("titles", []) if topic else [],
         "smart": "、".join(smart) or "—",
         "reason": reasons or ["資料累積中"],
         "entry": f"{close*0.99:.1f}~{close*1.01:.1f}" if close else "—",
@@ -114,16 +117,17 @@ def finalize(code, q, inst, fund, topic, tmom, bs, closes, vols) -> dict:
         "t2": f"{close*1.10:.1f}" if close else "—",
         "rsi": rsi if rsi is not None else "—",
         "vol": fmt_lots(volume), "close": close,
-        "closes": closes[-CHART_DAYS:],  # 供前端畫 K 線走勢
+        "closes": closes[-CHART_DAYS:],
     }
 
 
 def main() -> int:
     DATA.mkdir(exist_ok=True)
     twse, tpex, broker = TwseSource(), TpexSource(), BrokerSource()
-    funds_src, ov_src, hist_src = FundamentalsSource(), OverseasSource(), PriceHistorySource()
+    funds_src, ov_src = FundamentalsSource(), OverseasSource()
+    news_src, hist_src = NewsSource(), PriceHistorySource()
 
-    print("階段1:抓籌碼/基本面/海外…")
+    print("階段1:抓籌碼/基本面/海外/新聞…")
     quotes = _merge(twse.daily_quotes(), tpex.daily_quotes())
     inst = _merge(twse.institutional(), tpex.institutional())
     margin = _merge(twse.margin(), tpex.margin())
@@ -136,22 +140,24 @@ def main() -> int:
         print(f"  基本面失敗(略過):{e}")
     ov_prices = ov_src.momentum(sectors.all_overseas_symbols())
     topic_mom = sectors.topic_overseas_momentum(ov_prices)
-    print(f"  月營收 {len(funds)} / 海外 {len(ov_prices)} / 題材動能 {topic_mom}")
+    heat = news_src.topic_heat({n: t["kw"] for n, t in sectors.TOPICS.items()})
+    hot = sorted(heat.items(), key=lambda x: x[1]["heat"], reverse=True)[:3]
+    print(f"  月營收 {len(funds)} / 海外 {len(ov_prices)} / 新聞熱題 {[h[0] for h in hot]}")
 
     trading_date = twse.trading_date or datetime.now(TPE).strftime("%Y%m%d")
     hist = update_history(load_history(), trading_date, quotes)
 
-    # 階段1 算 s1~s4,挑候選
     cand = []
     for code, q in quotes.items():
         if q.get("close", 0) <= 0 or q.get("volume", 0) <= 0 or code.startswith("00"):
             continue
-        topic, tmom = sectors.best_topic_for(code, topic_mom)
-        bs = base_scores(q, inst.get(code, {}), margin.get(code, {}), funds.get(code), topic, tmom)
+        topic, tmom = sectors.best_topic_for(code, topic_mom, heat)
+        h = heat.get(topic, {}).get("heat", 0) if topic else 0
+        bs = base_scores(q, inst.get(code, {}), margin.get(code, {}), funds.get(code), topic, tmom, h)
         cand.append((code, q, topic, tmom, bs))
     cand.sort(key=lambda x: x[4]["base"], reverse=True)
     cand = cand[:CANDIDATES]
-    print(f"  候選 {len(cand)} 檔(母體中 s1~s4 最高者)")
+    print(f"  候選 {len(cand)} 檔")
 
     print("階段2:回補候選股 Yahoo 歷史 → 算技術面…")
     yh = hist_src.fetch([c[0] for c in cand])
@@ -161,10 +167,12 @@ def main() -> int:
     for code, q, topic, tmom, bs in cand:
         if code in yh:
             closes, vols = yh[code]["closes"], yh[code]["vols"]
-        else:  # Yahoo 失敗 → 退回每日累積值
+        else:
             closes = hist["closes"].get(code, [q["close"]])
             vols = hist["vols"].get(code, [])
-        records.append(finalize(code, q, inst.get(code, {}), funds.get(code), topic, tmom, bs, closes, vols))
+        records.append(finalize(
+            code, q, inst.get(code, {}), funds.get(code), topic, tmom,
+            heat.get(topic, {}) if topic else {}, bs, closes, vols))
 
     records.sort(key=lambda r: r["score"], reverse=True)
     top = records[:TOP_N]
@@ -178,15 +186,16 @@ def main() -> int:
         "sources": {
             "twse": True, "tpex": False, "broker": broker.enabled,
             "fundamentals": bool(funds), "overseas": bool(ov_prices),
-            "history": bool(yh),
+            "news": any(v["heat"] for v in heat.values()), "history": bool(yh),
         },
         "topic_momentum": topic_mom,
+        "topic_heat": {n: d["heat"] for n, d in heat.items()},
         "yahoo_ok": len(yh),
     }
     (DATA / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
-    print(f"完成:top {len(top)};技術面有真值 {rsi_ok}/{len(top)};交易日 {trading_date}")
+    print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")
     return 0
 
 
