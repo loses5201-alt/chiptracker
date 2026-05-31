@@ -1,19 +1,19 @@
-// ChipTracker 前端邏輯
-// 職責很單純:讀 data/*.json → 依分頁渲染畫面。所有運算都在後端(fetcher)做完了。
+// ChipTracker 前端邏輯(短線狙擊版)
+// 職責:讀 data/*.json → 依分頁渲染。所有運算都在後端(fetcher)做完。
 
-// 五項評分的標籤、滿分、顏色(對齊原版配色語彙)
 const SCORES = [
-  { k: "s1", label: "法人", max: 30, color: "#3b82f6" },
-  { k: "s2", label: "分點", max: 20, color: "#8b5cf6" },
-  { k: "s3", label: "融資券", max: 15, color: "#f59e0b" },
-  { k: "s4", label: "技術", max: 20, color: "#22c55e" },
-  { k: "s5", label: "動能", max: 15, color: "#ec4899" },
+  { k: "s1", label: "法人", max: 25, color: "#3b82f6" },
+  { k: "s2", label: "融資", max: 15, color: "#8b5cf6" },
+  { k: "s3", label: "基本面", max: 20, color: "#22c55e" },
+  { k: "s4", label: "國際", max: 20, color: "#06b6d4" },
+  { k: "s5", label: "動能", max: 20, color: "#ec4899" },
 ];
 const REC_TEXT = { strong: "強力建議", mid: "可留意", watch: "觀察" };
 const TABS = [
   { k: "entry", t: "進場建議" },
   { k: "foreign", t: "法人動向" },
-  { k: "margin", t: "融資券" },
+  { k: "fund", t: "基本面" },
+  { k: "intl", t: "國際連動" },
   { k: "overview", t: "總覽" },
 ];
 
@@ -39,12 +39,12 @@ async function boot() {
 
 function renderMeta() {
   const upd = META.updated_at ? META.updated_at.replace("T", " ").slice(0, 16) : "—";
-  const broker = META.sources && META.sources.broker ? "已啟用" : "未啟用";
+  const s = META.sources || {};
   document.getElementById("meta").innerHTML =
-    `掃描母體 <b>${META.universe || 0}</b> 檔(已排除 ETF) · ` +
-    `交易日 <b>${META.trading_date || "—"}</b> · ` +
-    `已累積 <b>${META.history_days || 0}</b> 個交易日 · ` +
-    `分點資料 <b>${broker}</b> · 更新 ${upd}`;
+    `掃描母體 <b>${META.universe || 0}</b> 檔 · 交易日 <b>${META.trading_date || "—"}</b> · ` +
+    `累積 <b>${META.history_days || 0}</b> 日 · ` +
+    `基本面 <b>${s.fundamentals ? "✓" : "✗"}</b> · 國際 <b>${s.overseas ? "✓" : "✗"}</b> · ` +
+    `分點 <b>${s.broker ? "✓" : "未啟用"}</b> · 更新 ${upd}`;
 }
 
 function renderTabs() {
@@ -62,29 +62,31 @@ function render() {
   if (view === "overview") return renderOverview(box);
   let list = [...STOCKS];
   if (view === "foreign") list.sort((a, b) => b.s1 - a.s1);
-  if (view === "margin") list.sort((a, b) => b.s3 - a.s3);
+  if (view === "fund") list = list.filter((s) => s.yoy != null).sort((a, b) => b.s3 - a.s3);
+  if (view === "intl") list = list.filter((s) => s.topic !== "—").sort((a, b) => b.s4 - a.s4);
+  if (!list.length) { box.innerHTML = '<div class="empty">此分頁暫無符合資料(可能尚未累積或非追蹤題材)</div>' + footNote(); return; }
   box.innerHTML = `<div class="grid">${list.map(card).join("")}</div>` + footNote();
 }
 
 function scoreBar(s) {
-  // s2(分點)資料源未啟用時淡化標示,誠實呈現「目前是中性值」
   const brokerOn = META.sources && META.sources.broker;
   return SCORES.map((d) => {
-    const off = d.k === "s2" && !brokerOn;
     const pct = Math.round((s[d.k] / d.max) * 100);
     return `<div class="score-row">
-      <span class="score-label ${off ? "off" : ""}">${d.label}</span>
-      <span class="score-track"><span class="score-fill" style="width:${pct}%;background:${off ? "#cbd5e1" : d.color}"></span></span>
+      <span class="score-label">${d.label}</span>
+      <span class="score-track"><span class="score-fill" style="width:${pct}%;background:${d.color}"></span></span>
       <span class="s-val">${s[d.k]}/${d.max}</span></div>`;
   }).join("");
 }
 
 function card(s) {
   const badges = (s.reason || []).map((r) => `<span class="badge">${r}</span>`).join("");
+  const topicTag = s.topic && s.topic !== "—"
+    ? `<span class="badge topic">${s.topic}</span>` : "";
   return `<div class="card">
     <div class="card-top">
       <div>
-        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span></div>
+        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span> ${topicTag}</div>
         <div class="stock-px">${s.close || "—"}</div>
       </div>
       <div style="text-align:right">
@@ -101,6 +103,8 @@ function card(s) {
     </div>
     <div class="detail">
       <div class="dl"><span class="k">籌碼</span><span class="v">${s.smart}</span></div>
+      ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
+      ${s.ov != null ? `<div class="dl"><span class="k">海外同業(5日)</span><span class="v ${s.ov >= 0 ? "up" : "down"}">${s.ov >= 0 ? "+" : ""}${s.ov}%</span></div>` : ""}
       <div class="dl"><span class="k">進場區</span><span class="v">${s.entry}</span></div>
       <div class="dl"><span class="k">停損 / 目標</span><span class="v">${s.stop} / ${s.t1}→${s.t2}</span></div>
       <div class="dl"><span class="k">RSI / 量</span><span class="v">${s.rsi} / ${s.vol}</span></div>
@@ -116,7 +120,7 @@ function renderOverview(box) {
   const strong = STOCKS.filter((s) => s.rec === "strong").length;
   const mid = STOCKS.filter((s) => s.rec === "mid").length;
   const kpi = `<div class="kpi">
-    <div class="box"><div class="n">${META.universe || 0}</div><div class="l">掃描母體(不含 ETF)</div></div>
+    <div class="box"><div class="n">${META.universe || 0}</div><div class="l">掃描母體</div></div>
     <div class="box"><div class="n" style="color:#ef4444">${strong}</div><div class="l">強力建議</div></div>
     <div class="box"><div class="n" style="color:#d97706">${mid}</div><div class="l">可留意</div></div>
     <div class="box"><div class="n">${META.history_days || 0}</div><div class="l">已累積交易日</div></div>
@@ -125,21 +129,21 @@ function renderOverview(box) {
     <td>${s.n}<span class="stock-code">${s.c}</span></td>
     <td>${s.close || "—"}</td>
     <td style="color:${recColor(s.rec)};font-weight:700">${s.score}</td>
-    <td>${s.s1}</td><td>${s.s3}</td><td>${s.pos}</td>
-    <td style="text-align:left">${s.smart}</td></tr>`).join("");
+    <td>${s.s1}</td><td>${s.s2}</td>
+    <td class="${s.yoy >= 0 ? "up" : "down"}">${s.yoy != null ? s.yoy + "%" : "—"}</td>
+    <td>${s.topic !== "—" ? s.topic : "—"}</td></tr>`).join("");
   box.innerHTML = kpi + `<table><thead><tr>
-    <th>股票</th><th>收盤</th><th>總分</th><th>法人</th><th>融資券</th><th>位置</th><th>籌碼</th>
+    <th>股票</th><th>收盤</th><th>總分</th><th>法人</th><th>融資</th><th>營收YoY</th><th>題材</th>
     </tr></thead><tbody>${rows}</tbody></table>` + footNote();
 }
 
 function footNote() {
-  const brokerOn = META.sources && META.sources.broker;
+  const s = META.sources || {};
   return `<div class="note">
-    ⚠️ 本站為個人技術練習,所有評分與進場/停損/目標價皆由程式依公開資料自動估算,
-    <b>非投資建議</b>。技術面與動能需累積足夠交易日後才有參考價值
-    (目前累積 ${META.history_days || 0} 日)。
-    分點(主力)資料目前${brokerOn ? "已啟用" : "未啟用,以中性值計分"}。
-    資料來源:臺灣證券交易所公開資料(三大法人 T86、融資融券 MI_MARGN、個股日成交)。
+    ⚠️ 本站為個人技術練習,所有評分與進出價皆由程式依公開資料自動估算,<b>非投資建議</b>,
+    短線追高風險高,請自設停損。技術/動能需累積足夠交易日才有意義(目前 ${META.history_days || 0} 日)。
+    分點(主力)資料${s.broker ? "已啟用" : "未啟用"};題材新聞面尚未納入。
+    資料來源:證交所(法人/融資券/月營收/價量)+ Stooq(海外同業)。
   </div>`;
 }
 
