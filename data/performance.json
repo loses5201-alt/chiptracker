@@ -1,0 +1,91 @@
+{
+ "status": "ok",
+ "generated_at": "2026-05-31T23:14:09+08:00",
+ "snapshot_days": 1,
+ "date_range": [
+  "20260529",
+  "20260529"
+ ],
+ "recommendations_seen": 40,
+ "windows": [
+  5,
+  10,
+  20,
+  60
+ ],
+ "groups": {
+  "strong": {
+   "5": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "10": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "20": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "60": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   }
+  },
+  "mid": {
+   "5": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "10": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "20": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "60": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   }
+  },
+  "watch": {
+   "5": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "10": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "20": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   },
+   "60": {
+    "avg": null,
+    "win_rate": null,
+    "n": 0
+   }
+  }
+ },
+ "monotonic": {
+  "5": null,
+  "10": null,
+  "20": null,
+  "60": null
+ },
+ "note": "收益率=推薦日收盤後 N 交易日漲跌幅%。需累積足夠交易日(最短窗 5 日、最長 60 日)樣本才有統計意義。"
+}

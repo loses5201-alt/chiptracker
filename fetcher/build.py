@@ -179,6 +179,19 @@ def main() -> int:
 
     (DATA / "history.json").write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     (DATA / "stocks.json").write_text(json.dumps(top, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    # 每日快照:把今天的推薦另存一份帶交易日的檔,供日後回測(收益率/勝率/分組驗證)。
+    # stocks.json 隔天會被覆蓋,快照則永久保留 → 這是回測的原料。
+    # 只存回測需要的精簡欄位(代號/名稱/分數/建議/收盤),避免快照肥大。
+    snap_dir = DATA / "daily"
+    snap_dir.mkdir(exist_ok=True)
+    snapshot = [
+        {"c": r["c"], "n": r["n"], "rec": r["rec"], "score": r["score"],
+         "topic": r["topic"], "close": r["close"]}
+        for r in top
+    ]
+    (snap_dir / f"{trading_date}.json").write_text(
+        json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
     meta = {
         "updated_at": datetime.now(TPE).isoformat(timespec="seconds"),
         "trading_date": trading_date,

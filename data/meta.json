@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-05-31T16:11:56+08:00",
+ "updated_at": "2026-05-31T23:14:03+08:00",
  "trading_date": "20260529",
  "universe": 80,
  "shown": 40,
@@ -9,6 +9,7 @@
   "broker": false,
   "fundamentals": true,
   "overseas": true,
+  "news": true,
   "history": true
  },
  "topic_momentum": {
@@ -17,6 +18,21 @@
   "CoWoS先進封裝": 2.04,
   "矽智財IP": 18.46,
   "蘋果供應鏈": 2.32
+ },
+ "topic_heat": {
+  "記憶體": 1,
+  "AI伺服器": 16,
+  "CoWoS先進封裝": 2,
+  "矽光子CPO": 3,
+  "散熱": 1,
+  "機器人": 2,
+  "重電綠能": 0,
+  "軍工航太": 1,
+  "PCB": 5,
+  "矽智財IP": 0,
+  "被動元件": 0,
+  "蘋果供應鏈": 0,
+  "低軌衛星": 8
  },
  "yahoo_ok": 80
 }
