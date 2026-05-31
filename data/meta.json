@@ -1,0 +1,12 @@
+{
+ "updated_at": "2026-05-31T09:16:24+08:00",
+ "trading_date": "20260529",
+ "universe": 1135,
+ "shown": 40,
+ "sources": {
+  "twse": true,
+  "tpex": false,
+  "broker": false
+ },
+ "history_days": 1
+}

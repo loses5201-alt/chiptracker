@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 本機暫存/探測檔
+probe_result.json
+chk_out.json
+.tmp_*
+
+# 編輯器
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,48 @@
+# 每交易日自動抓取台股籌碼資料並更新 data/*.json
+# 全程在 GitHub 雲端執行,產出的 JSON commit 回 repo,GitHub Pages 自動服務。
+name: daily-fetch
+
+on:
+  schedule:
+    # GitHub cron 為 UTC。09:30 UTC = 台北 17:30,確保法人/融資券當日資料已公布。
+    # (排程可能延遲數分鐘至數十分鐘,屬正常現象)
+    - cron: "30 9 * * 1-5"
+  workflow_dispatch: {}   # 也允許在 Actions 頁面手動觸發
+
+permissions:
+  contents: write          # 需要寫入權限才能把更新後的 data/ commit 回來
+
+# 避免兩次排程重疊(例如手動觸發碰上排程)同時寫入造成衝突
+concurrency:
+  group: daily-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r fetcher/requirements.txt
+
+      - name: Build data
+        run: python -m fetcher.build
+
+      - name: Commit data if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "資料無變化,略過 commit"
+          else
+            git commit -m "chore(data): 自動更新籌碼資料 $(date -u +%Y-%m-%d)"
+            git push
+          fi
