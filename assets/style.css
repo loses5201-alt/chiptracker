@@ -159,6 +159,29 @@ tbody tr:hover{background:#eef2ff}
 .score-pill.strong{background:#ef4444}.score-pill.mid{background:#d97706}.score-pill.watch{background:#94a3b8}
 .up{color:#ef4444}.down{color:#22c55e}
 
+/* 回測分頁 */
+.bt-intro{background:rgba(255,255,255,.92);border:1px solid rgba(99,102,241,.1);border-radius:16px;padding:28px;box-shadow:0 4px 14px rgba(79,70,229,.05)}
+.bt-intro h3{font-size:18px;font-weight:800;margin-bottom:12px}
+.bt-intro p{color:#475569;line-height:1.7;margin-bottom:10px}
+.bt-intro .bt-wait{background:#fffbeb;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:8px;color:#b45309;font-weight:500}
+.bt-intro .bt-note{font-size:13px;color:#94a3b8}
+.bt-head h3{font-size:18px;font-weight:800}
+.bt-meta{font-size:13px;color:#94a3b8;margin-top:4px}
+.bt-table td{vertical-align:top}
+.bt-grp{font-weight:700;text-align:left!important}
+.bt-grp .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px}
+.bt-ret{display:block;font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.bt-ret.up{color:#ef4444}.bt-ret.down{color:#22c55e}
+.bt-sub{display:block;font-size:11px;color:#94a3b8;margin-top:2px}
+.bt-na{color:#cbd5e1;text-align:center}
+.mono-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.mono-box{border-radius:12px;padding:14px;text-align:center;border:1px solid}
+.mono-box .mono-w{font-size:13px;color:#64748b;margin-bottom:4px}
+.mono-box .mono-t{font-size:14px;font-weight:700}
+.mono-box.ok{background:#f0fdf4;border-color:#bbf7d0}.mono-box.ok .mono-t{color:#16a34a}
+.mono-box.bad{background:#fef2f2;border-color:#fecaca}.mono-box.bad .mono-t{color:#dc2626}
+.mono-box.na{background:#f8fafc;border-color:#e2e8f0}.mono-box.na .mono-t{color:#94a3b8}
+
 .empty{text-align:center;color:#94a3b8;padding:60px 20px}
 .note{font-size:12px;color:#64748b;line-height:1.7;margin-top:20px;padding:15px;background:rgba(255,255,255,.85);border-radius:13px;border:1px solid rgba(99,102,241,.08)}
 .note b{color:#b45309}

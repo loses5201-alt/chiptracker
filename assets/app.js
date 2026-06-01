@@ -16,11 +16,13 @@ const TABS = [
   { k: "fund", t: "基本面" },
   { k: "topic", t: "題材熱度" },
   { k: "intl", t: "國際連動" },
+  { k: "backtest", t: "回測" },
   { k: "overview", t: "總覽" },
 ];
 
 let STOCKS = [];
 let META = {};
+let PERF = null;
 let view = "entry";
 
 async function boot() {
@@ -29,6 +31,8 @@ async function boot() {
       fetch("data/stocks.json?_=" + Date.now()).then((r) => r.json()),
       fetch("data/meta.json?_=" + Date.now()).then((r) => r.json()),
     ]);
+    // 回測資料可能還不存在(剛起步),失敗不影響主畫面
+    PERF = await fetch("data/performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -66,6 +70,7 @@ function render() {
   if (!STOCKS.length) { box.innerHTML = '<div class="empty">尚無資料</div>'; return; }
   if (view === "overview") return renderOverview(box);
   if (view === "topic") return renderTopic(box);
+  if (view === "backtest") return renderBacktest(box);
   let list = [...STOCKS];
   if (view === "foreign") list.sort((a, b) => b.s1 - a.s1);
   if (view === "fund") list = list.filter((s) => s.yoy != null).sort((a, b) => b.s3 - a.s3);
@@ -78,8 +83,11 @@ function render() {
 }
 
 // ── 六面向雷達圖(純 SVG,無外部相依)──
+// viewBox 比繪圖區寬,左右各留 padX 給標籤文字,避免「基本面」之類被切。
 function radar(s, size = 150, showLabels = true) {
-  const cx = size / 2, cy = size / 2, R = size / 2 - (showLabels ? 26 : 8);
+  const padX = showLabels ? 34 : 8;   // 水平留白(標籤用)
+  const vbW = size + padX * 2;          // viewBox 寬度
+  const cx = vbW / 2, cy = size / 2, R = size / 2 - (showLabels ? 22 : 8);
   const n = SCORES.length;
   const ang = (i) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
   const ptAt = (i, rad) => [cx + Math.cos(ang(i)) * rad, cy + Math.sin(ang(i)) * rad];
@@ -119,7 +127,7 @@ function radar(s, size = 150, showLabels = true) {
       labels += `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#64748b" font-weight="500">${d.label}</text>`;
     });
   }
-  return `<svg viewBox="0 0 ${size} ${size}" class="radar" width="${size}" height="${size}">
+  return `<svg viewBox="0 0 ${vbW} ${size}" class="radar" width="${vbW}" height="${size}">
     <defs><radialGradient id="radarFill"><stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/><stop offset="100%" stop-color="#818cf8" stop-opacity="0.12"/></radialGradient></defs>
     ${grid}${axes}${poly}${dots}${labels}</svg>`;
 }
@@ -272,6 +280,64 @@ function renderTopic(box) {
   box.querySelectorAll(".t-chip").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
   );
+}
+
+// 回測分頁:驗證「分數越高、後續越會漲嗎?」
+function renderBacktest(box) {
+  if (!PERF || PERF.status !== "ok") {
+    const msg = PERF && PERF.msg ? PERF.msg : "回測資料尚未產生。";
+    box.innerHTML = `<div class="bt-intro">
+      <h3>📊 推薦成效回測</h3>
+      <p>這裡會驗證一件最重要的事:<b>分數越高的股票,之後真的越會漲嗎?</b></p>
+      <p class="bt-wait">${msg}</p>
+      <p class="bt-note">原理:每天把推薦清單存檔,之後用真實股價算「推薦日後 5/10/20/60 個交易日」的收益率,
+      再按 強力建議 / 可留意 / 觀察 分組比較。今天才開始累積,約 <b>1 週後</b>看到 5 日結果、
+      <b>1 個月後</b>看到 20 日結果。系統每交易日自動累積,你不用做任何事。</p>
+    </div>` + footNote();
+    return;
+  }
+  const W = PERF.windows || [5, 10, 20, 60];
+  const G = [
+    { k: "strong", t: "強力建議", c: "#ef4444" },
+    { k: "mid", t: "可留意", c: "#d97706" },
+    { k: "watch", t: "觀察", c: "#64748b" },
+  ];
+  const cell = (g, w) => {
+    const d = (PERF.groups[g.k] || {})[w] || {};
+    if (d.avg == null) return `<td class="bt-na">—</td>`;
+    const cls = d.avg >= 0 ? "up" : "down";
+    return `<td><span class="bt-ret ${cls}">${d.avg >= 0 ? "+" : ""}${d.avg}%</span>
+      <span class="bt-sub">勝${d.win_rate}% · n=${d.n}</span></td>`;
+  };
+  const rows = G.map((g) => `<tr>
+    <td class="bt-grp"><span class="dot" style="background:${g.c}"></span>${g.t}</td>
+    ${W.map((w) => cell(g, w)).join("")}
+  </tr>`).join("");
+
+  // 單調性判讀(分數是否有預測力)
+  const mono = PERF.monotonic || {};
+  const monoCards = W.map((w) => {
+    const v = mono[String(w)];
+    const txt = v === true ? "✓ 有預測力" : v === false ? "✗ 待調整" : "資料不足";
+    const cls = v === true ? "ok" : v === false ? "bad" : "na";
+    return `<div class="mono-box ${cls}"><div class="mono-w">${w}日</div><div class="mono-t">${txt}</div></div>`;
+  }).join("");
+
+  box.innerHTML = `
+    <div class="bt-head">
+      <div><h3>📊 推薦成效回測</h3>
+        <p class="bt-meta">累積 ${PERF.snapshot_days} 個交易日 · 評估 ${PERF.recommendations_seen} 筆推薦 ·
+        ${PERF.date_range ? PERF.date_range.join(" ~ ") : ""}</p></div>
+    </div>
+    <div class="m-section">各組平均收益率(推薦日後 N 個交易日)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr>
+      <th>分組</th>${W.map((w) => `<th>${w} 日</th>`).join("")}
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="m-section">評分預測力(強力建議 ≥ 可留意 ≥ 觀察?)</div>
+    <div class="mono-grid">${monoCards}</div>
+    <div class="note">${PERF.note || ""} 「有預測力」代表該窗口下分數越高、平均報酬越高,
+    是評分有效的證據;樣本數(n)太小時結果僅供參考。</div>
+  ` + footNote();
 }
 
 function renderOverview(box) {

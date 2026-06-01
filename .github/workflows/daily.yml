@@ -35,6 +35,10 @@ jobs:
       - name: Build data
         run: python -m fetcher.build
 
+      - name: Run backtest
+        # 用當天新存的快照 + 歷史快照,重算推薦成效(data/performance.json)
+        run: python -m analytics.backtest
+
       - name: Commit data if changed
         run: |
           git config user.name  "github-actions[bot]"
