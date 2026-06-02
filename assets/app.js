@@ -221,6 +221,31 @@ function scoreBar(s) {
   }).join("");
 }
 
+// 自動生成「為何推薦」白話分析:依各面向分數與指標組合成一段話 + 風險提示。
+function analyzeStock(s) {
+  const parts = [];
+  if (s.s1 / 22 >= 0.75 && s.smart && s.smart !== "—") parts.push(`法人買盤偏多(${s.smart})`);
+  if (s.yoy != null && s.yoy >= 20) parts.push(`月營收年增 <b>${s.yoy}%</b>、基本面強`);
+  if (s.topic && s.topic !== "—") {
+    let t = `屬 <b>${s.topic}</b> 題材`;
+    if (s.ov != null && s.ov > 0) t += `、海外同業近期 +${s.ov}%`;
+    if (s.heat) t += `、新聞熱度 ${s.heat} 則`;
+    parts.push(t);
+  }
+  if (s.s6 / 15 >= 0.7) parts.push(`技術動能轉強(RSI ${s.rsi})`);
+  if (s.s2 / 8 >= 0.7) parts.push("融資券籌碼配合");
+  const recTxt = { strong: "強力建議", mid: "可留意", watch: "觀察" }[s.rec] || "";
+  const lead = `<b>${s.n}</b>(${s.c})以 <b>${s.score} 分</b>列為「${recTxt}」,主要因為:`;
+  const body = parts.length ? parts.join("、") + "。" : "六面向分數綜合達標。";
+  const risks = [];
+  if (s.pos >= 85) risks.push(`位階偏高(區間位置 ${s.pos}),宜等拉回或嚴設停損`);
+  if (typeof s.rsi === "number" && s.rsi >= 80) risks.push(`RSI ${s.rsi} 過熱`);
+  if (s.s1 / 22 < 0.4) risks.push("法人參與度偏低");
+  if (s.yoy != null && s.yoy < 0) risks.push(`月營收年減 ${s.yoy}%`);
+  const riskTxt = risks.length ? `<div class="why-risk">⚠️ 留意:${risks.join("、")}。</div>` : "";
+  return `<div class="why">${lead}${body}${riskTxt}</div>`;
+}
+
 function openDetail(code) {
   const s = STOCKS.find((x) => x.c === code);
   if (!s) return;
@@ -237,6 +262,7 @@ function openDetail(code) {
       </div>
       <button class="m-close" id="m-close">✕</button>
     </div>
+    ${analyzeStock(s)}
     <div class="m-grid">
       <div>
         <div class="m-section">六面向體質</div>

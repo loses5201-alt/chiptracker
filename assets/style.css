@@ -306,3 +306,11 @@ body.dark .down,body.dark .ms-v.down,body.dark .dl .v.down,body.dark .bt-ret.dow
 body.dark .pulse-margin{color:#cbd5e1}
 body.dark .pulse-margin .pm-v{color:#e2e8f0}
 body.dark .pm-trend.rise{color:#a78bfa}body.dark .pm-trend.fall{color:#38bdf8}
+
+/* 個股「為何推薦」白話分析 */
+.why{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.15);border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.75;color:#475569;margin-top:8px}
+.why b{color:#4f46e5;font-weight:700}
+.why-risk{margin-top:7px;color:#b45309;font-size:12.5px}
+body.dark .why{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.25);color:#cbd5e1}
+body.dark .why b{color:#a5b4fc}
+body.dark .why-risk{color:#fcd34d}
