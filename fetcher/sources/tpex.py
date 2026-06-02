@@ -87,6 +87,7 @@ class TpexSource(BaseSource):
                 "low": _num(row.get("Low")),
                 "close": _num(row.get("Close")),
                 "volume": _num(row.get("TradingShares")),  # 單位:股
+                "change": _num(row.get("Change")),         # 當日漲跌價(供大盤漲跌家數)
             }
         return out
 

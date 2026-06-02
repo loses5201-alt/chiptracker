@@ -78,7 +78,8 @@ function render() {
   if (view === "fund") list = list.filter((s) => s.yoy != null).sort((a, b) => b.s3 - a.s3);
   if (view === "intl") list = list.filter((s) => s.topic && s.topic !== "—").sort((a, b) => b.s4 - a.s4);
   if (!list.length) { box.innerHTML = '<div class="empty">此分頁暫無符合資料</div>' + footNote(); return; }
-  box.innerHTML = `<div class="grid">${list.map((s, i) => card(s, i)).join("")}</div>` + footNote();
+  const pulse = view === "entry" ? marketPulse() : "";
+  box.innerHTML = pulse + `<div class="grid">${list.map((s, i) => card(s, i)).join("")}</div>` + footNote();
   box.querySelectorAll(".card").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
   );
@@ -399,12 +400,47 @@ function renderOverview(box) {
     <td>${s.s1}</td>
     <td class="${s.yoy >= 0 ? "up" : "down"}">${s.yoy != null ? s.yoy + "%" : "—"}</td>
     <td>${s.topic && s.topic !== "—" ? s.topic : "—"}</td></tr>`).join("");
-  box.innerHTML = kpi + `<div class="table-wrap"><table><thead><tr>
+  box.innerHTML = marketPulse() + kpi + `<div class="table-wrap"><table><thead><tr>
     <th>#</th><th>股票</th><th>收盤</th><th>總分</th><th>法人</th><th>營收YoY</th><th>題材</th>
     </tr></thead><tbody>${rows}</tbody></table></div>` + footNote();
   box.querySelectorAll("tbody tr").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
   );
+}
+
+// 大盤環境溫度計面板(讀 META.market_pulse)。選股前先看市場順風還逆風。
+function marketPulse() {
+  const p = META.market_pulse;
+  if (!p) return "";
+  const yi = (v) => (v >= 0 ? "+" : "") + Math.round(v) + "億";
+  const cls = (v) => (v >= 0 ? "up" : "down");
+  const m = p.margin_chg_lots;
+  const lots = (m >= 0 ? "+" : "") + (Math.abs(m) >= 10000 ? (m / 10000).toFixed(1) + "萬張" : Math.round(m) + "張");
+  const total = p.advancers + p.decliners + p.unchanged || 1;
+  const chips = (p.hot_topics || []).map((t) =>
+    `<span class="pulse-topic">${t.name}${t.heat ? ` 🔥${t.heat}` : ""}</span>`).join("");
+  return `<div class="pulse ${p.mood}">
+    <div class="pulse-mood"><div class="pm-tag">${p.mood_text}</div><div class="pm-sub">今日盤勢</div></div>
+    <div class="pulse-body">
+      <div class="pulse-breadth">
+        <div class="pb-bar">
+          <span class="pb-up" style="width:${(p.advancers / total) * 100}%"></span>
+          <span class="pb-fl" style="width:${(p.unchanged / total) * 100}%"></span>
+          <span class="pb-dn" style="width:${(p.decliners / total) * 100}%"></span>
+        </div>
+        <div class="pb-cap"><span class="up">▲ ${p.advancers}</span>
+          <span class="muted">平 ${p.unchanged}</span>
+          <span class="down">▼ ${p.decliners}</span> · 上漲廣度 <b>${p.breadth_pct}%</b></div>
+      </div>
+      <div class="pulse-inst">
+        <span>外資 <b class="${cls(p.inst_foreign)}">${yi(p.inst_foreign)}</b></span>
+        <span>投信 <b class="${cls(p.inst_trust)}">${yi(p.inst_trust)}</b></span>
+        <span>自營 <b class="${cls(p.inst_dealer)}">${yi(p.inst_dealer)}</b></span>
+        <span class="pulse-sep">融資 <b class="${cls(m)}">${lots}</b></span>
+      </div>
+      <div class="pulse-topics">強勢題材 ${chips}</div>
+    </div>
+  </div>`;
 }
 
 function footNote() {

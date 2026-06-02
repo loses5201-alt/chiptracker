@@ -80,6 +80,7 @@ class TwseSource(BaseSource):
                 "low": _num(row.get("LowestPrice")),
                 "close": _num(row.get("ClosingPrice")),
                 "volume": _num(row.get("TradeVolume")),  # 單位:股
+                "change": _num(row.get("Change")),       # 當日漲跌價(供大盤漲跌家數)
             }
         return out
 

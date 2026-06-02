@@ -21,7 +21,7 @@ from .sources.fundamentals import FundamentalsSource
 from .sources.overseas import OverseasSource
 from .sources.news import NewsSource
 from .sources.price_history import PriceHistorySource
-from . import sectors, scoring
+from . import sectors, scoring, market_pulse
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -213,6 +213,7 @@ def main() -> int:
         "topic_momentum": topic_mom,
         "topic_heat": {n: d["heat"] for n, d in heat.items()},
         "yahoo_ok": len(yh),
+        "market_pulse": market_pulse.compute(quotes, inst, margin, heat, topic_mom),
     }
     (DATA / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 
