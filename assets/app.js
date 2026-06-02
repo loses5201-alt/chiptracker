@@ -30,6 +30,7 @@ let view = "entry";
 
 async function boot() {
   setupTheme();
+  renderSkeleton();
   try {
     [STOCKS, META] = await Promise.all([
       fetch("data/stocks.json?_=" + Date.now()).then((r) => r.json()),
@@ -609,6 +610,13 @@ function marketPulse() {
       <div class="pulse-topics">強勢題材 ${chips}</div>
     </div>
   </div>`;
+}
+
+// 載入骨架(資料抓取期間的佔位,取代純文字「載入中」)
+function renderSkeleton() {
+  const sk = `<div class="sk-card"><div class="sk-line w60"></div><div class="sk-line w40"></div>
+    <div class="sk-radar"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>`;
+  document.getElementById("content").innerHTML = `<div class="grid">${sk.repeat(6)}</div>`;
 }
 
 function footNote() {
