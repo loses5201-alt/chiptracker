@@ -24,6 +24,7 @@ from .sources.price_history import PriceHistorySource
 from . import sectors, scoring, market_pulse
 from .sources.margin_history import fetch_trend as fetch_margin_trend
 from .sources.inst_history import fetch_trend as fetch_inst_trend
+from .sources.stock_chip_history import fetch as fetch_stock_chips
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -238,6 +239,16 @@ def main() -> int:
                     "margin": mtrend, "inst": itrend},
                    ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"  大盤趨勢:融資 {len(mtrend)} 日 / 法人 {len(itrend)} 日")
+
+    # 個股籌碼歷史(top 上市股近10交易日法人/融資趨勢,延續「看一段時間」到個股)
+    twse_top = [r["c"] for r in top if r["mkt"] == "twse"]
+    try:
+        chips = fetch_stock_chips(twse_top, 10)
+    except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
+        chips = {}
+        print(f"  個股籌碼失敗(略過):{e}")
+    (DATA / "stock_chips.json").write_text(json.dumps(chips, ensure_ascii=False), encoding="utf-8")
+    print(f"  個股籌碼 {len(chips)} 檔")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")

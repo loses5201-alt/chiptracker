@@ -25,6 +25,7 @@ let META = {};
 let PERF = null;
 let WREVIEW = null;
 let MTREND = null;
+let CHIPS = null;
 let view = "entry";
 
 async function boot() {
@@ -38,6 +39,7 @@ async function boot() {
     PERF = await fetch("data/performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     WREVIEW = await fetch("data/weight_review.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     MTREND = await fetch("data/market_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    CHIPS = await fetch("data/stock_chips.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -153,6 +155,8 @@ function card(s, idx) {
   const newsLine = s.news && s.news.length
     ? `<div class="card-news">📰 ${s.news[0]}</div>` : "";
   const chg = s.yoy != null ? s.yoy : null;
+  const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
+  const streakTag = ch && Math.abs(ch.inst_buy_streak) >= 3 ? streakBadge(ch.inst_buy_streak) : "";
   return `<div class="card" data-code="${s.c}" style="--i:${idx}">
     <div class="rank-badge ${s.rec}">${idx + 1}</div>
     <div class="card-top">
@@ -174,7 +178,7 @@ function card(s, idx) {
       ${statBox("RSI", s.rsi, null)}
       ${statBox("位置", s.pos, null)}
     </div>
-    <div class="badges">${badges}</div>
+    <div class="badges">${streakTag}${badges}</div>
     ${newsLine}
     <div class="card-hint">點擊看完整走勢與進出場 ›</div>
   </div>`;
@@ -227,6 +231,20 @@ function scoreBar(s) {
   }).join("");
 }
 
+// 法人連買/連賣天數徽章(signed:正連買紅、負連賣綠)
+function streakBadge(st) {
+  if (!st) return "";
+  const buy = st > 0;
+  return `<span class="streak-badge ${buy ? "up" : "down"}">法人${buy ? "連買" : "連賣"}${Math.abs(st)}天</span>`;
+}
+// 融資餘額近期變化說明
+function marginNote(arr) {
+  if (!arr || arr.length < 2) return "";
+  const f = arr[0], l = arr[arr.length - 1];
+  const pct = f ? (l - f) / f * 100 : 0;
+  return `${arr.length}日 ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
 // 自動生成「為何推薦」白話分析:依各面向分數與指標組合成一段話 + 風險提示。
 function analyzeStock(s) {
   const parts = [];
@@ -260,6 +278,14 @@ function openDetail(code) {
     ? `<div class="m-section">📰 ${s.topic} 相關新聞(近期)</div>
        <div class="news-list">${s.news.map((t) => `<div class="news-item">${t}</div>`).join("")}</div>`
     : "";
+  const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
+  const chipBlock = ch && ch.inst && ch.inst.length >= 2
+    ? `<div class="m-section">籌碼趨勢(近 ${ch.inst.length} 交易日,法人單位:股)</div>
+       <div class="chip-trend">
+         <div class="ct-row"><span class="ct-k">三大法人</span>${miniSpark(ch.inst, 150, 30)}${streakBadge(ch.inst_buy_streak)}</div>
+         <div class="ct-row"><span class="ct-k">融資餘額</span>${miniSpark(ch.margin, 150, 30)}<span class="ct-note">${marginNote(ch.margin)}</span></div>
+       </div>`
+    : (s.mkt === "tpex" ? `<div class="m-section">籌碼趨勢</div><div class="note">上櫃個股籌碼歷史暫不支援</div>` : "");
   document.getElementById("modal-body").innerHTML = `
     <div class="m-head">
       <div>
@@ -281,6 +307,7 @@ function openDetail(code) {
     </div>
     <div class="m-section">近 ${s.closes ? s.closes.length : 0} 日走勢</div>
     ${sparkline(s.closes)}
+    ${chipBlock}
     ${newsBlock}
     <div class="m-section">籌碼與基本面</div>
     <div class="dl"><span class="k">三大法人</span><span class="v">${s.smart}</span></div>
