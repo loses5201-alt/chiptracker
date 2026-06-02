@@ -18,6 +18,7 @@ build.py 的 _merge() 會自動把上櫃股票與上市股票合併納入評分,
   trust   = 投信   dealer = 自營商合計   total = 三大法人合計
 """
 import json
+import time
 import urllib.request
 from .base import BaseSource
 
@@ -59,10 +60,22 @@ def _is_common_stock(code: str) -> bool:
     return len(code) == 4 and code.isdigit()
 
 
-def _openapi(path: str) -> list:
-    req = urllib.request.Request(f"{OPENAPI}{path}", headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode("utf-8"))
+def _openapi(path: str, tries: int = 4) -> list:
+    """
+    打櫃買 OpenAPI 並回傳 list。
+    價量端點回應大(~4MB),雲端偶發 IncompleteRead(連線被截斷)→ 退避重試;
+    timeout 拉長到 60 秒,給大回應足夠傳輸時間。
+    """
+    last = "(none)"
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(f"{OPENAPI}{path}", headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception as e:  # noqa: BLE001 — 含 IncompleteRead/限流,退避重試
+            last = str(e)
+            time.sleep(1.5 * (i + 1))
+    raise RuntimeError(f"TPEX OpenAPI {path} 連 {tries} 次失敗:{last}")
 
 
 class TpexSource(BaseSource):
