@@ -383,6 +383,39 @@ function renderBacktest(box) {
   ` + footNote();
 }
 
+// 今日選股橫斷面特徵:六面向平均、題材分布、平均技術指標。從 STOCKS 即時算。
+function overviewProfile() {
+  const n = STOCKS.length || 1;
+  const bars = SCORES.map((d) => {
+    const v = STOCKS.reduce((a, s) => a + (s[d.k] || 0), 0) / n;
+    const pct = Math.round((v / d.max) * 100);
+    return `<div class="score-row"><span class="score-label">${d.label}</span>
+      <span class="score-track"><span class="score-fill" style="width:${pct}%;background:${d.color}"></span></span>
+      <span class="s-val">${v.toFixed(1)}/${d.max}</span></div>`;
+  }).join("");
+
+  const tc = {};
+  STOCKS.forEach((s) => { if (s.topic && s.topic !== "—") tc[s.topic] = (tc[s.topic] || 0) + 1; });
+  const topics = Object.entries(tc).sort((a, b) => b[1] - a[1]);
+  const maxT = Math.max(1, ...topics.map((t) => t[1]));
+  const topicBars = topics.map(([nm, c]) =>
+    `<div class="pt-row"><span class="pt-name">${nm}</span>
+      <span class="pt-track"><span class="pt-fill" style="width:${(c / maxT) * 100}%"></span></span>
+      <span class="pt-c">${c}</span></div>`).join("") || '<span class="muted">無題材標記</span>';
+
+  const numRsi = STOCKS.filter((s) => typeof s.rsi === "number");
+  const avgRsi = numRsi.length ? (numRsi.reduce((a, s) => a + s.rsi, 0) / numRsi.length).toFixed(0) : "—";
+  const avgPos = (STOCKS.reduce((a, s) => a + (s.pos || 0), 0) / n).toFixed(0);
+  const ms = META.market_split || {};
+  return `<div class="profile">
+    <div class="prof-col"><div class="prof-h">今日選股 · 六面向平均</div>${bars}</div>
+    <div class="prof-col"><div class="prof-h">題材分布(檔數)</div>
+      <div class="prof-topics">${topicBars}</div>
+      <div class="prof-misc">平均 RSI <b>${avgRsi}</b> · 平均區間位置 <b>${avgPos}</b> · 上市 <b>${ms.twse || 0}</b> / 上櫃 <b>${ms.tpex || 0}</b></div>
+    </div>
+  </div>`;
+}
+
 function renderOverview(box) {
   const strong = STOCKS.filter((s) => s.rec === "strong").length;
   const mid = STOCKS.filter((s) => s.rec === "mid").length;
@@ -400,7 +433,7 @@ function renderOverview(box) {
     <td>${s.s1}</td>
     <td class="${s.yoy >= 0 ? "up" : "down"}">${s.yoy != null ? s.yoy + "%" : "—"}</td>
     <td>${s.topic && s.topic !== "—" ? s.topic : "—"}</td></tr>`).join("");
-  box.innerHTML = marketPulse() + kpi + `<div class="table-wrap"><table><thead><tr>
+  box.innerHTML = marketPulse() + kpi + overviewProfile() + `<div class="table-wrap"><table><thead><tr>
     <th>#</th><th>股票</th><th>收盤</th><th>總分</th><th>法人</th><th>營收YoY</th><th>題材</th>
     </tr></thead><tbody>${rows}</tbody></table></div>` + footNote();
   box.querySelectorAll("tbody tr").forEach((el) =>
