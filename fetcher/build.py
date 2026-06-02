@@ -22,6 +22,7 @@ from .sources.overseas import OverseasSource
 from .sources.news import NewsSource
 from .sources.price_history import PriceHistorySource
 from . import sectors, scoring, market_pulse
+from .sources.margin_history import fetch_trend as fetch_margin_trend
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -216,6 +217,18 @@ def main() -> int:
         "market_pulse": market_pulse.compute(quotes, inst, margin, heat, topic_mom),
     }
     (DATA / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    # 大盤融資餘額週趨勢:單日數字無意義,看「總量 + 逐日增減」才有判讀價值。
+    # 證交所信用交易統計可指定日期 → 直接回填近 10 交易日,不必從零累積。
+    try:
+        mtrend = fetch_margin_trend(10)
+    except Exception as e:  # noqa: BLE001 — 趨勢失敗不影響主資料
+        mtrend = []
+        print(f"  融資趨勢失敗(略過):{e}")
+    (DATA / "margin_trend.json").write_text(
+        json.dumps({"updated": datetime.now(TPE).isoformat(timespec="seconds"), "days": mtrend},
+                   ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"  融資趨勢 {len(mtrend)} 日")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")

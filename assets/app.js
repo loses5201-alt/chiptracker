@@ -24,6 +24,7 @@ let STOCKS = [];
 let META = {};
 let PERF = null;
 let WREVIEW = null;
+let MTREND = null;
 let view = "entry";
 
 async function boot() {
@@ -36,6 +37,7 @@ async function boot() {
     // 回測資料可能還不存在(剛起步),失敗不影響主畫面
     PERF = await fetch("data/performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     WREVIEW = await fetch("data/weight_review.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    MTREND = await fetch("data/margin_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -462,17 +464,47 @@ function renderOverview(box) {
   );
 }
 
-// 大盤環境溫度計面板(讀 META.market_pulse)。選股前先看市場順風還逆風。
+// 大盤指標 mini 走勢(中性藍紫,不套紅綠 — 融資增減無絕對好壞,看趨勢方向即可)
+function miniSpark(vals, w = 116, h = 26) {
+  if (!vals || vals.length < 2) return "";
+  const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 1, pad = 2;
+  const pts = vals.map((v, i) => {
+    const x = pad + (i / (vals.length - 1)) * (w - 2 * pad);
+    const y = pad + (1 - (v - min) / rng) * (h - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const up = vals[vals.length - 1] >= vals[0];
+  const c = up ? "#8b5cf6" : "#0ea5e9";
+  return `<svg viewBox="0 0 ${w} ${h}" class="mini-spark" preserveAspectRatio="none"><polyline points="${pts.join(" ")}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+// 大盤環境溫度計面板(讀 META.market_pulse + MTREND 融資週趨勢)。選股前先看順風逆風。
 function marketPulse() {
   const p = META.market_pulse;
   if (!p) return "";
   const yi = (v) => (v >= 0 ? "+" : "") + Math.round(v) + "億";
   const cls = (v) => (v >= 0 ? "up" : "down");
-  const m = p.margin_chg_lots;
-  const lots = (m >= 0 ? "+" : "") + (Math.abs(m) >= 10000 ? (m / 10000).toFixed(1) + "萬張" : Math.round(m) + "張");
   const total = p.advancers + p.decliners + p.unchanged || 1;
   const chips = (p.hot_topics || []).map((t) =>
     `<span class="pulse-topic">${t.name}${t.heat ? ` 🔥${t.heat}` : ""}</span>`).join("");
+
+  // 融資餘額:優先用回填的週趨勢(總量+逐日走勢),沒有才退回當日變化
+  let marginRow;
+  const mt = MTREND && MTREND.days && MTREND.days.length >= 2 ? MTREND.days : null;
+  if (mt) {
+    const arr = mt.map((d) => d.margin_lots);
+    const cur = arr[arr.length - 1], first = arr[0];
+    const pct = first ? (cur - first) / first * 100 : 0;
+    marginRow = `<div class="pulse-margin">
+      <span class="pm-k">融資餘額</span><b class="pm-v">${(cur / 10000).toFixed(1)}萬張</b>
+      ${miniSpark(arr)}
+      <span class="pm-trend ${pct >= 0 ? "rise" : "fall"}">${mt.length}日 ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></div>`;
+  } else {
+    const m = p.margin_chg_lots;
+    const lots = (m >= 0 ? "+" : "") + (Math.abs(m) >= 10000 ? (m / 10000).toFixed(1) + "萬張" : Math.round(m) + "張");
+    marginRow = `<div class="pulse-margin"><span class="pm-k">融資(當日)</span> <b class="${cls(m)}">${lots}</b></div>`;
+  }
+
   return `<div class="pulse ${p.mood}">
     <div class="pulse-mood"><div class="pm-tag">${p.mood_text}</div><div class="pm-sub">今日盤勢</div></div>
     <div class="pulse-body">
@@ -490,8 +522,8 @@ function marketPulse() {
         <span>外資 <b class="${cls(p.inst_foreign)}">${yi(p.inst_foreign)}</b></span>
         <span>投信 <b class="${cls(p.inst_trust)}">${yi(p.inst_trust)}</b></span>
         <span>自營 <b class="${cls(p.inst_dealer)}">${yi(p.inst_dealer)}</b></span>
-        <span class="pulse-sep">融資 <b class="${cls(m)}">${lots}</b></span>
       </div>
+      ${marginRow}
       <div class="pulse-topics">強勢題材 ${chips}</div>
     </div>
   </div>`;

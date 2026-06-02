@@ -295,3 +295,14 @@ body.dark .note b{color:#fcd34d}
 body.dark .prof-misc{border-top-color:rgba(148,163,184,.12);color:#94a3b8}
 /* 漲跌語意色在深色下調亮 */
 body.dark .down,body.dark .ms-v.down,body.dark .dl .v.down,body.dark .bt-ret.down,body.dark .tg-box.down .tg-v{color:#4ade80}
+
+/* 融資餘額週趨勢(溫度計) */
+.pulse-margin{display:flex;align-items:center;gap:10px;font-size:13px;color:#475569;flex-wrap:wrap}
+.pulse-margin .pm-k{color:#94a3b8}
+.pulse-margin .pm-v{font-family:'JetBrains Mono',monospace;font-size:15px;color:#334155}
+.mini-spark{width:116px;height:26px;display:block}
+.pm-trend{font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.pm-trend.rise{color:#7c3aed}.pm-trend.fall{color:#0284c7}
+body.dark .pulse-margin{color:#cbd5e1}
+body.dark .pulse-margin .pm-v{color:#e2e8f0}
+body.dark .pm-trend.rise{color:#a78bfa}body.dark .pm-trend.fall{color:#38bdf8}
