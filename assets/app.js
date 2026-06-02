@@ -23,6 +23,7 @@ const TABS = [
 let STOCKS = [];
 let META = {};
 let PERF = null;
+let WREVIEW = null;
 let view = "entry";
 
 async function boot() {
@@ -33,6 +34,7 @@ async function boot() {
     ]);
     // 回測資料可能還不存在(剛起步),失敗不影響主畫面
     PERF = await fetch("data/performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    WREVIEW = await fetch("data/weight_review.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -292,11 +294,29 @@ function renderTopic(box) {
   );
 }
 
+// 評分面向健檢表(誰在主導排名),即時可看,放回測頁頂部。
+function weightReviewBlock() {
+  const w = WREVIEW;
+  if (!w || w.status !== "ok") return "";
+  const rows = w.factors.map((f) => {
+    const corr = f.corr_total != null ? f.corr_total : "—";
+    const hi = f.corr_total != null && f.corr_total >= 0.5 ? "bt-ret up" : "";
+    return `<tr><td class="bt-grp">${f.name}</td><td>${f.weight}</td>
+      <td>${f.fill_pct}%</td><td>${f.discrim}%</td><td><span class="${hi}">${corr}</span></td></tr>`;
+  }).join("");
+  return `<div class="m-section">評分面向健檢(誰在主導排名)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr>
+      <th>面向</th><th>配置滿分</th><th>平均佔比</th><th>區分度</th><th>與總分相關</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="note">${w.note || ""}</div>`;
+}
+
 // 回測分頁:驗證「分數越高、後續越會漲嗎?」
 function renderBacktest(box) {
+  const wr = weightReviewBlock();
   if (!PERF || PERF.status !== "ok") {
     const msg = PERF && PERF.msg ? PERF.msg : "回測資料尚未產生。";
-    box.innerHTML = `<div class="bt-intro">
+    box.innerHTML = wr + `<div class="bt-intro">
       <h3>📊 推薦成效回測</h3>
       <p>這裡會驗證一件最重要的事:<b>分數越高的股票,之後真的越會漲嗎?</b></p>
       <p class="bt-wait">${msg}</p>
@@ -358,7 +378,7 @@ function renderBacktest(box) {
       return `<td><span class="bt-ret ${cls}">${v >= 0 ? "+" : ""}${v}</span></td>`;
     }).join("")}</tr>`).join("");
 
-  box.innerHTML = `
+  box.innerHTML = wr + `
     <div class="bt-head">
       <div><h3>📊 推薦成效回測</h3>
         <p class="bt-meta">累積 ${PERF.snapshot_days} 個交易日 · 評估 ${PERF.recommendations_seen} 筆推薦 ·

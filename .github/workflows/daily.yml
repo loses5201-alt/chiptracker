@@ -44,6 +44,10 @@ jobs:
         # 用當天新存的快照 + 歷史快照,重算推薦成效(data/performance.json)
         run: python -m analytics.backtest
 
+      - name: Run weight review
+        # 評分面向健檢:六面向區分度/相關(data/weight_review.json)
+        run: python -m analytics.weight_review
+
       - name: Commit data if changed
         run: |
           git config user.name  "github-actions[bot]"

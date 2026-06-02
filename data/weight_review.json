@@ -1,0 +1,62 @@
+{
+ "status": "ok",
+ "generated_at": "2026-06-02T19:54:36+08:00",
+ "sample": 40,
+ "factors": [
+  {
+   "key": "s1",
+   "name": "法人",
+   "weight": 22,
+   "mean": 21.15,
+   "fill_pct": 96.1,
+   "discrim": 16.8,
+   "corr_total": 0.081
+  },
+  {
+   "key": "s2",
+   "name": "融資",
+   "weight": 8,
+   "mean": 6.38,
+   "fill_pct": 79.7,
+   "discrim": 20.5,
+   "corr_total": -0.164
+  },
+  {
+   "key": "s3",
+   "name": "基本面",
+   "weight": 20,
+   "mean": 18.8,
+   "fill_pct": 94.0,
+   "discrim": 10.7,
+   "corr_total": -0.021
+  },
+  {
+   "key": "s4",
+   "name": "國際",
+   "weight": 20,
+   "mean": 11.9,
+   "fill_pct": 59.5,
+   "discrim": 28.1,
+   "corr_total": 0.859
+  },
+  {
+   "key": "s5",
+   "name": "題材",
+   "weight": 15,
+   "mean": 8.18,
+   "fill_pct": 54.5,
+   "discrim": 22.9,
+   "corr_total": 0.759
+  },
+  {
+   "key": "s6",
+   "name": "動能",
+   "weight": 15,
+   "mean": 11.6,
+   "fill_pct": 77.3,
+   "discrim": 12.6,
+   "corr_total": 0.144
+  }
+ ],
+ "note": "基於今日入選股。fill%=平均佔滿分比、區分度=分數離散程度(高=在拉開排名)、corr=與總分相關。權重是否該調,需對照回測『面向預測力』累積後判斷:高權重但低預測力→考慮降;低權重但高預測力→考慮升。"
+}
