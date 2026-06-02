@@ -1,38 +1,44 @@
 {
  "status": "ok",
- "generated_at": "2026-06-01T23:39:26+08:00",
- "snapshot_days": 1,
+ "generated_at": "2026-06-02T13:40:15+08:00",
+ "snapshot_days": 2,
  "date_range": [
   "20260529",
-  "20260529"
+  "20260601"
  ],
- "recommendations_seen": 40,
+ "recommendations_seen": 80,
  "windows": [
   5,
   10,
   20,
   60
  ],
+ "benchmark": "^TWII",
+ "benchmark_ok": true,
  "groups": {
   "strong": {
    "5": {
     "avg": null,
     "win_rate": null,
+    "alpha": null,
     "n": 0
    },
    "10": {
     "avg": null,
     "win_rate": null,
+    "alpha": null,
     "n": 0
    },
    "20": {
     "avg": null,
     "win_rate": null,
+    "alpha": null,
     "n": 0
    },
    "60": {
     "avg": null,
     "win_rate": null,
+    "alpha": null,
     "n": 0
    }
   },
@@ -40,6 +46,60 @@
    "5": {
     "avg": null,
     "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "10": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "20": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "60": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   }
+  },
+  "watch": {
+   "5": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "10": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "20": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   },
+   "60": {
+    "avg": null,
+    "win_rate": null,
+    "alpha": null,
+    "n": 0
+   }
+  }
+ },
+ "by_market": {
+  "twse": {
+   "5": {
+    "avg": null,
+    "win_rate": null,
     "n": 0
    },
    "10": {
@@ -58,7 +118,7 @@
     "n": 0
    }
   },
-  "watch": {
+  "tpex": {
    "5": {
     "avg": null,
     "win_rate": null,
@@ -81,11 +141,49 @@
    }
   }
  },
+ "factor_power": {
+  "法人": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  },
+  "融資": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  },
+  "基本面": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  },
+  "國際": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  },
+  "題材": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  },
+  "技術": {
+   "5": null,
+   "10": null,
+   "20": null,
+   "60": null
+  }
+ },
  "monotonic": {
   "5": null,
   "10": null,
   "20": null,
   "60": null
  },
- "note": "收益率=推薦日收盤後 N 交易日漲跌幅%。需累積足夠交易日(最短窗 5 日、最長 60 日)樣本才有統計意義。"
+ "note": "收益率=推薦日收盤後 N 交易日漲跌幅%;alpha=同期超越大盤幅度;面向預測力=該面向高分股 vs 低分股的 alpha 差。需累積足夠交易日樣本才有統計意義。"
 }

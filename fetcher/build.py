@@ -85,7 +85,7 @@ def base_scores(q, inst, mg, fund, topic, tmom, heat) -> dict:
     }
 
 
-def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols) -> dict:
+def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols, market) -> dict:
     """階段2:補 s6 技術動能,組成前端要的完整記錄。"""
     volume = q.get("volume", 0)
     avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
@@ -101,7 +101,7 @@ def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols) -> d
         smart.append(f"投信{'+' if inst['trust']>=0 else ''}{fmt_lots(inst['trust'])}")
 
     return {
-        "c": code, "n": q.get("name", ""), "topic": topic or "—",
+        "c": code, "n": q.get("name", ""), "mkt": market, "topic": topic or "—",
         "rec": scoring.grade(total), "score": total,
         "s1": bs["s1"], "s2": bs["s2"], "s3": bs["s3"], "s4": bs["s4"], "s5": bs["s5"], "s6": s6,
         "pos": pos if pos is not None else 50,
@@ -128,10 +128,12 @@ def main() -> int:
     news_src, hist_src = NewsSource(), PriceHistorySource()
 
     print("階段1:抓籌碼/基本面/海外/新聞…")
-    quotes = _merge(twse.daily_quotes(), tpex.daily_quotes())
+    tw_q, tp_q = twse.daily_quotes(), tpex.daily_quotes()
+    quotes = _merge(tw_q, tp_q)
+    tpex_codes = set(tp_q)  # 標記市場別(上市/上櫃),供快照與回測分組
     inst = _merge(twse.institutional(), tpex.institutional())
     margin = _merge(twse.margin(), tpex.margin())
-    print(f"  價量 {len(quotes)} / 法人 {len(inst)} / 融資券 {len(margin)}")
+    print(f"  價量 {len(quotes)}(上市 {len(tw_q)}/上櫃 {len(tp_q)}) / 法人 {len(inst)} / 融資券 {len(margin)}")
 
     try:
         funds = funds_src.revenue()
@@ -160,7 +162,7 @@ def main() -> int:
     print(f"  候選 {len(cand)} 檔")
 
     print("階段2:回補候選股 Yahoo 歷史 → 算技術面…")
-    yh = hist_src.fetch([c[0] for c in cand])
+    yh = hist_src.fetch([(c[0], "tpex" if c[0] in tpex_codes else "twse") for c in cand])
     print(f"  Yahoo 成功 {len(yh)}/{len(cand)} 檔")
 
     records = []
@@ -170,9 +172,10 @@ def main() -> int:
         else:
             closes = hist["closes"].get(code, [q["close"]])
             vols = hist["vols"].get(code, [])
+        market = "tpex" if code in tpex_codes else "twse"
         records.append(finalize(
             code, q, inst.get(code, {}), funds.get(code), topic, tmom,
-            heat.get(topic, {}) if topic else {}, bs, closes, vols))
+            heat.get(topic, {}) if topic else {}, bs, closes, vols, market))
 
     records.sort(key=lambda r: r["score"], reverse=True)
     top = records[:TOP_N]
@@ -182,12 +185,14 @@ def main() -> int:
 
     # 每日快照:把今天的推薦另存一份帶交易日的檔,供日後回測(收益率/勝率/分組驗證)。
     # stocks.json 隔天會被覆蓋,快照則永久保留 → 這是回測的原料。
-    # 只存回測需要的精簡欄位(代號/名稱/分數/建議/收盤),避免快照肥大。
+    # 存回測需要的欄位:代號/名稱/市場/分數/建議/收盤,另存六面向 s1~s6
+    # → 讓回測能分析「哪個面向最有預測力」(高分面向後續是否真的較會漲)。
     snap_dir = DATA / "daily"
     snap_dir.mkdir(exist_ok=True)
     snapshot = [
-        {"c": r["c"], "n": r["n"], "rec": r["rec"], "score": r["score"],
-         "topic": r["topic"], "close": r["close"]}
+        {"c": r["c"], "n": r["n"], "mkt": r["mkt"], "rec": r["rec"], "score": r["score"],
+         "topic": r["topic"], "close": r["close"],
+         "s": [r["s1"], r["s2"], r["s3"], r["s4"], r["s5"], r["s6"]]}
         for r in top
     ]
     (snap_dir / f"{trading_date}.json").write_text(
@@ -196,8 +201,12 @@ def main() -> int:
         "updated_at": datetime.now(TPE).isoformat(timespec="seconds"),
         "trading_date": trading_date,
         "universe": len(cand), "shown": len(top),
+        "market_split": {
+            "twse": sum(1 for r in top if r["mkt"] == "twse"),
+            "tpex": sum(1 for r in top if r["mkt"] == "tpex"),
+        },
         "sources": {
-            "twse": True, "tpex": False, "broker": broker.enabled,
+            "twse": True, "tpex": bool(tp_q), "broker": broker.enabled,
             "fundamentals": bool(funds), "overseas": bool(ov_prices),
             "news": any(v["heat"] for v in heat.values()), "history": bool(yh),
         },

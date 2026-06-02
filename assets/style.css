@@ -48,6 +48,9 @@ body{
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .stock-name{font-size:18px;font-weight:800;letter-spacing:.3px}
 .stock-code{font-size:12px;color:#94a3b8;margin-left:6px;font-family:'JetBrains Mono',monospace;font-weight:500}
+.mkt{font-size:11px;font-weight:700;margin-left:6px;padding:1px 6px;border-radius:5px;vertical-align:middle}
+.mkt.listed{background:#e0e7ff;color:#4338ca}
+.mkt.otc{background:#ffedd5;color:#c2410c}
 .px-row{display:flex;align-items:center;gap:8px;margin-top:3px}
 .stock-px{font-size:19px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#334155}
 .ct-right{text-align:center;flex-shrink:0}

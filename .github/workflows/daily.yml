@@ -32,6 +32,11 @@ jobs:
       - name: Install deps
         run: pip install -r fetcher/requirements.txt
 
+      - name: Validate sources
+        # 撈資料前先驗證上市/上櫃來源健康(筆數/恆等式/指標股/交易日一致)。
+        # 失敗即中止,絕不拿壞資料去評分、也不會 commit 污染 data/。
+        run: python -m fetcher.validate
+
       - name: Build data
         run: python -m fetcher.build
 

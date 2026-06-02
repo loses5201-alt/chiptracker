@@ -1,33 +1,39 @@
 """
 回測引擎 — 驗證 ChipTracker 推薦股的實際後續表現。
 
-核心問題:「分數高的股票,之後真的比較會漲嗎?」
+核心問題:「分數高的股票,之後真的比較會漲嗎?哪個面向最準?」
 做法:讀每日推薦快照(data/daily/*.json),用 Yahoo 抓含日期的股價,
-      以「推薦日」精準對齊,算多時間窗(5/10/20/60 交易日)收益率,
-      再依建議強度(strong/mid/watch)分組統計。
+      以「推薦日」精準對齊,算多時間窗(5/10/20/60 交易日)收益率。
 輸出 data/performance.json,供前端「回測」分頁顯示。
 
 執行:python -m analytics.backtest   (於 repo 根目錄)
 
-對應使用者「多窗口 + 勝率 + 分組」需求:
-  - 多窗口:推薦日後 +5/+10/+20/+60 交易日收益率
-  - 勝率:各組各窗口「收益>0」比例
-  - 分組:strong/mid/watch 分開 → 驗證「分數越高報酬越高」的單調性(monotonic)
+四個分析維度:
+  1. 強度分組   strong/mid/watch 各窗口平均收益、勝率,並驗證單調性(分數越高越會漲)
+  2. 超額報酬   個股收益 − 同期大盤(加權指數)收益 = alpha,排除大盤齊漲齊跌的干擾
+  3. 市場別     上市(twse) vs 上櫃(tpex)推薦表現是否不同
+  4. 面向預測力 六面向(法人/融資/基本面/國際/題材/技術)各自高分組 vs 低分組的
+                超額報酬差 → 找出最有預測力的面向(差越大越能預測上漲)
 
-(對比大盤超額報酬為日後可加選項,目前未納入。)
+注意:後三項需快照含 mkt / s 欄位(新版 build 才有),且需累積足夠交易日樣本才有意義。
 """
 from __future__ import annotations
 import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from statistics import median
 
-from fetcher.sources.price_history import _fetch_one
+from fetcher.sources.price_history import _fetch_one, fetch_symbol
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 DAILY = DATA / "daily"
 WINDOWS = [5, 10, 20, 60]
 GROUPS = ["strong", "mid", "watch"]
+MARKETS = ["twse", "tpex"]
+FACTOR_NAMES = ["法人", "融資", "基本面", "國際", "題材", "技術"]  # 對應 s1~s6
+BENCHMARK = "^TWII"  # 加權指數,算超額報酬的基準
+MIN_SPLIT = 6        # 面向預測力:高低分組各需足夠樣本才計算
 TPE = timezone(timedelta(hours=8))
 
 
@@ -44,10 +50,10 @@ def _load_snapshots() -> list[tuple[str, list]]:
     return out
 
 
-def _series(code: str, cache: dict, rng: str = "6mo") -> dict | None:
+def _series(code: str, market: str | None, cache: dict, rng: str = "6mo") -> dict | None:
     """取個股含日期的收盤序列(快取,回測窗最長 60 日 → 用 6mo 確保夠長)。"""
     if code not in cache:
-        _, data = _fetch_one(code, rng)
+        _, data = _fetch_one((code, market), rng)
         cache[code] = data  # 可能為 None
     return cache[code]
 
@@ -79,25 +85,46 @@ def run() -> dict:
                        "msg": "尚無每日快照。請先讓 build 跑幾個交易日累積 data/daily/,回測才有原料。"})
 
     cache: dict[str, dict | None] = {}
-    buckets = {g: {w: [] for w in WINDOWS} for g in GROUPS}
-    counted, matured = 0, 0
+    index = fetch_symbol(BENCHMARK, "1y")  # 大盤序列(算 alpha 用),抓一次共用
+    idx_cache: dict[str, dict] = {}
+
+    def index_fr(rec_date: str) -> dict[int, float | None]:
+        if rec_date not in idx_cache:
+            idx_cache[rec_date] = _forward_returns(index, rec_date) if index else {w: None for w in WINDOWS}
+        return idx_cache[rec_date]
+
+    g_ret = {g: {w: [] for w in WINDOWS} for g in GROUPS}
+    g_alpha = {g: {w: [] for w in WINDOWS} for g in GROUPS}
+    m_ret = {m: {w: [] for w in WINDOWS} for m in MARKETS}
+    factor_samples: list[tuple[list, dict]] = []  # [(六面向分數, {window: alpha})]
+    counted = 0
     dates_all = [d for d, _ in snapshots]
 
     for rec_date, recs in snapshots:
+        ifr = index_fr(rec_date)
         for r in recs:
-            code, rec = r.get("c"), r.get("rec")
-            if rec not in buckets:
-                continue
-            series = _series(code, cache)
+            code, rec, mkt = r.get("c"), r.get("rec"), r.get("mkt")
+            series = _series(code, mkt, cache)
             if not series:
                 continue
             fr = _forward_returns(series, rec_date)
             counted += 1
+            alpha: dict[int, float] = {}
             for w in WINDOWS:
-                if fr[w] is not None:
-                    buckets[rec][w].append(fr[w])
-                    if w == WINDOWS[0]:
-                        matured += 1
+                if fr[w] is None:
+                    continue
+                if rec in g_ret:
+                    g_ret[rec][w].append(fr[w])
+                if mkt in m_ret:
+                    m_ret[mkt][w].append(fr[w])
+                if ifr.get(w) is not None:
+                    a = round(fr[w] - ifr[w], 2)
+                    alpha[w] = a
+                    if rec in g_alpha:
+                        g_alpha[rec][w].append(a)
+            s = r.get("s")
+            if s and len(s) == 6 and alpha:
+                factor_samples.append((s, alpha))
 
     result = {
         "status": "ok",
@@ -106,27 +133,67 @@ def run() -> dict:
         "date_range": [dates_all[0], dates_all[-1]] if dates_all else [],
         "recommendations_seen": counted,
         "windows": WINDOWS,
-        "groups": {g: _group_stats(buckets[g]) for g in GROUPS},
-        "monotonic": _check_monotonic(buckets),
-        "note": ("收益率=推薦日收盤後 N 交易日漲跌幅%。需累積足夠交易日(最短窗 "
-                 f"{WINDOWS[0]} 日、最長 {WINDOWS[-1]} 日)樣本才有統計意義。"),
+        "benchmark": BENCHMARK,
+        "benchmark_ok": bool(index),
+        "groups": {g: _group_stats(g_ret[g], g_alpha[g]) for g in GROUPS},
+        "by_market": {m: _market_stats(m_ret[m]) for m in MARKETS},
+        "factor_power": _factor_power(factor_samples),
+        "monotonic": _check_monotonic(g_ret),
+        "note": ("收益率=推薦日收盤後 N 交易日漲跌幅%;alpha=同期超越大盤幅度;"
+                 "面向預測力=該面向高分股 vs 低分股的 alpha 差。需累積足夠交易日樣本才有統計意義。"),
     }
     return _write(result)
 
 
-def _group_stats(window_data: dict[int, list]) -> dict:
-    """單一分組各窗口統計:平均收益、勝率、樣本數。"""
+def _group_stats(ret: dict[int, list], alpha: dict[int, list]) -> dict:
+    """單一強度分組各窗口統計:平均收益、勝率、樣本數、平均超額報酬。"""
     out = {}
     for w in WINDOWS:
-        arr = window_data[w]
-        if arr:
-            out[str(w)] = {
-                "avg": round(sum(arr) / len(arr), 2),
-                "win_rate": round(sum(1 for x in arr if x > 0) / len(arr) * 100, 1),
-                "n": len(arr),
-            }
-        else:
-            out[str(w)] = {"avg": None, "win_rate": None, "n": 0}
+        arr, aarr = ret[w], alpha[w]
+        out[str(w)] = {
+            "avg": round(sum(arr) / len(arr), 2) if arr else None,
+            "win_rate": round(sum(1 for x in arr if x > 0) / len(arr) * 100, 1) if arr else None,
+            "alpha": round(sum(aarr) / len(aarr), 2) if aarr else None,
+            "n": len(arr),
+        }
+    return out
+
+
+def _market_stats(ret: dict[int, list]) -> dict:
+    """單一市場別各窗口統計:平均收益、勝率、樣本數。"""
+    out = {}
+    for w in WINDOWS:
+        arr = ret[w]
+        out[str(w)] = {
+            "avg": round(sum(arr) / len(arr), 2) if arr else None,
+            "win_rate": round(sum(1 for x in arr if x > 0) / len(arr) * 100, 1) if arr else None,
+            "n": len(arr),
+        }
+    return out
+
+
+def _factor_power(samples: list[tuple[list, dict]]) -> dict:
+    """
+    各面向預測力:把樣本依該面向分數中位數切高/低兩半,
+    比較兩半的平均超額報酬(alpha),差值為正且越大 → 該面向越能預測上漲。
+    樣本不足(任一半 < MIN_SPLIT)→ None。
+    """
+    out: dict[str, dict] = {}
+    for i, name in enumerate(FACTOR_NAMES):
+        row: dict[str, float | None] = {}
+        for w in WINDOWS:
+            pairs = [(s[i], a[w]) for s, a in samples if w in a]
+            if len(pairs) < MIN_SPLIT * 2:
+                row[str(w)] = None
+                continue
+            med = median(p[0] for p in pairs)
+            high = [a for sc, a in pairs if sc >= med]
+            low = [a for sc, a in pairs if sc < med]
+            if len(high) < MIN_SPLIT or len(low) < MIN_SPLIT:
+                row[str(w)] = None
+                continue
+            row[str(w)] = round(sum(high) / len(high) - sum(low) / len(low), 2)
+        out[name] = row
     return out
 
 
@@ -141,10 +208,7 @@ def _check_monotonic(buckets: dict) -> dict[str, bool | None]:
         for g in GROUPS:
             arr = buckets[g][w]
             avgs.append(sum(arr) / len(arr) if arr else None)
-        if any(a is None for a in avgs):
-            out[str(w)] = None
-        else:
-            out[str(w)] = avgs[0] >= avgs[1] >= avgs[2]  # strong >= mid >= watch
+        out[str(w)] = None if any(a is None for a in avgs) else avgs[0] >= avgs[1] >= avgs[2]
     return out
 
 
@@ -159,12 +223,15 @@ if __name__ == "__main__":
     import sys
     r = run()
     if r["status"] == "ok":
-        print(f"回測完成:{r['snapshot_days']} 天快照、{r['recommendations_seen']} 筆推薦評估")
+        print(f"回測完成:{r['snapshot_days']} 天快照、{r['recommendations_seen']} 筆推薦評估"
+              f"(大盤基準 {'OK' if r['benchmark_ok'] else '抓取失敗'})")
         for g in GROUPS:
             cells = " | ".join(
-                f"{w}日 avg={r['groups'][g][str(w)]['avg']}% 勝{r['groups'][g][str(w)]['win_rate']}% n={r['groups'][g][str(w)]['n']}"
+                f"{w}日 avg={r['groups'][g][str(w)]['avg']}% α={r['groups'][g][str(w)]['alpha']} n={r['groups'][g][str(w)]['n']}"
                 for w in WINDOWS)
             print(f"  {g:6}: {cells}")
+        print(f"  市場別: {r['by_market']}")
+        print(f"  面向預測力: {r['factor_power']}")
         print(f"  評分單調性(strong≥mid≥watch): {r['monotonic']}")
     else:
         print(r["msg"])

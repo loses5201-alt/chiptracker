@@ -47,11 +47,13 @@ async function boot() {
 function renderMeta() {
   const upd = META.updated_at ? META.updated_at.replace("T", " ").slice(0, 16) : "—";
   const s = META.sources || {};
+  const ms = META.market_split;
+  const split = ms ? ` · 推薦含上市 <b>${ms.twse}</b>/上櫃 <b>${ms.tpex}</b>` : "";
   const chip = (on, t) => `<span class="src ${on ? "on" : "off"}">${t}</span>`;
   document.getElementById("meta").innerHTML =
-    `<span class="meta-main">候選 <b>${META.universe || 0}</b> 檔 · 交易日 <b>${META.trading_date || "—"}</b></span>` +
+    `<span class="meta-main">候選 <b>${META.universe || 0}</b> 檔 · 交易日 <b>${META.trading_date || "—"}</b>${split}</span>` +
     `<span class="meta-src">` +
-    chip(s.history, "技術") + chip(s.fundamentals, "基本面") +
+    chip(s.tpex, "上櫃") + chip(s.history, "技術") + chip(s.fundamentals, "基本面") +
     chip(s.overseas, "國際") + chip(s.news, "新聞") + chip(s.broker, "分點") +
     `</span><span class="meta-upd">更新 ${upd}</span>`;
 }
@@ -132,6 +134,13 @@ function radar(s, size = 150, showLabels = true) {
     ${grid}${axes}${poly}${dots}${labels}</svg>`;
 }
 
+// 市場別標籤(上市/上櫃)。舊資料無 mkt 欄位時不顯示,避免誤標。
+function mktTag(mkt) {
+  if (mkt === "tpex") return `<span class="mkt otc">上櫃</span>`;
+  if (mkt === "twse") return `<span class="mkt listed">上市</span>`;
+  return "";
+}
+
 function card(s, idx) {
   const badges = (s.reason || []).slice(0, 3).map((r) => `<span class="badge">${r}</span>`).join("");
   const topicTag = s.topic && s.topic !== "—" ? `<span class="badge topic">${s.topic}</span>` : "";
@@ -142,7 +151,7 @@ function card(s, idx) {
     <div class="rank-badge ${s.rec}">${idx + 1}</div>
     <div class="card-top">
       <div class="ct-left">
-        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span></div>
+        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
         <div class="px-row"><span class="stock-px">${s.close || "—"}</span> ${topicTag}</div>
       </div>
       <div class="ct-right">
@@ -217,7 +226,7 @@ function openDetail(code) {
   document.getElementById("modal-body").innerHTML = `
     <div class="m-head">
       <div>
-        <div class="m-name">${s.n}<span class="stock-code">${s.c}</span> ${topicTag}</div>
+        <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)} ${topicTag}</div>
         <div class="m-px">${s.close || "—"} <span class="pill ${s.rec}">${REC_TEXT[s.rec]} ${s.score}分</span></div>
       </div>
       <button class="m-close" id="m-close">✕</button>
@@ -306,8 +315,9 @@ function renderBacktest(box) {
     const d = (PERF.groups[g.k] || {})[w] || {};
     if (d.avg == null) return `<td class="bt-na">—</td>`;
     const cls = d.avg >= 0 ? "up" : "down";
+    const a = d.alpha;
     return `<td><span class="bt-ret ${cls}">${d.avg >= 0 ? "+" : ""}${d.avg}%</span>
-      <span class="bt-sub">勝${d.win_rate}% · n=${d.n}</span></td>`;
+      <span class="bt-sub">α ${a != null ? (a >= 0 ? "+" : "") + a : "—"} · 勝${d.win_rate}% · n=${d.n}</span></td>`;
   };
   const rows = G.map((g) => `<tr>
     <td class="bt-grp"><span class="dot" style="background:${g.c}"></span>${g.t}</td>
@@ -323,6 +333,30 @@ function renderBacktest(box) {
     return `<div class="mono-box ${cls}"><div class="mono-w">${w}日</div><div class="mono-t">${txt}</div></div>`;
   }).join("");
 
+  // 市場別表(上市 vs 上櫃)
+  const MK = [{ k: "twse", t: "上市" }, { k: "tpex", t: "上櫃" }];
+  const bm = PERF.by_market || {};
+  const mkCell = (m, w) => {
+    const d = (bm[m.k] || {})[w] || {};
+    if (d.avg == null) return `<td class="bt-na">—</td>`;
+    const cls = d.avg >= 0 ? "up" : "down";
+    return `<td><span class="bt-ret ${cls}">${d.avg >= 0 ? "+" : ""}${d.avg}%</span>
+      <span class="bt-sub">勝${d.win_rate}% · n=${d.n}</span></td>`;
+  };
+  const mkRows = MK.map((m) => `<tr>
+    <td class="bt-grp">${m.t}</td>${W.map((w) => mkCell(m, w)).join("")}</tr>`).join("");
+
+  // 面向預測力表(各面向高分股 vs 低分股的超額報酬差)
+  const FP = PERF.factor_power || {};
+  const fpRows = Object.keys(FP).map((name) => `<tr>
+    <td class="bt-grp">${name}</td>
+    ${W.map((w) => {
+      const v = FP[name][String(w)];
+      if (v == null) return `<td class="bt-na">—</td>`;
+      const cls = v >= 0 ? "up" : "down";
+      return `<td><span class="bt-ret ${cls}">${v >= 0 ? "+" : ""}${v}</span></td>`;
+    }).join("")}</tr>`).join("");
+
   box.innerHTML = `
     <div class="bt-head">
       <div><h3>📊 推薦成效回測</h3>
@@ -335,8 +369,16 @@ function renderBacktest(box) {
     </tr></thead><tbody>${rows}</tbody></table></div>
     <div class="m-section">評分預測力(強力建議 ≥ 可留意 ≥ 觀察?)</div>
     <div class="mono-grid">${monoCards}</div>
+    <div class="m-section">市場別表現(上市 vs 上櫃)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr>
+      <th>市場</th>${W.map((w) => `<th>${w} 日</th>`).join("")}
+    </tr></thead><tbody>${mkRows}</tbody></table></div>
+    <div class="m-section">六面向預測力(高分股 − 低分股 的超額報酬,正值=該面向越能預測上漲)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr>
+      <th>面向</th>${W.map((w) => `<th>${w} 日</th>`).join("")}
+    </tr></thead><tbody>${fpRows}</tbody></table></div>
     <div class="note">${PERF.note || ""} 「有預測力」代表該窗口下分數越高、平均報酬越高,
-    是評分有效的證據;樣本數(n)太小時結果僅供參考。</div>
+    是評分有效的證據;α=超越大盤幅度;樣本數(n)太小時結果僅供參考。</div>
   ` + footNote();
 }
 
@@ -351,7 +393,7 @@ function renderOverview(box) {
   </div>`;
   const rows = STOCKS.map((s, i) => `<tr data-code="${s.c}">
     <td class="rank">${i + 1}</td>
-    <td>${s.n}<span class="stock-code">${s.c}</span></td>
+    <td>${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</td>
     <td>${s.close || "—"}</td>
     <td><span class="score-pill ${s.rec}">${s.score}</span></td>
     <td>${s.s1}</td>
@@ -371,7 +413,7 @@ function footNote() {
     ⚠️ 本站為個人技術練習,所有評分與進出價皆由程式依公開資料自動估算,<b>非投資建議</b>,
     短線追高風險高,請自設停損。
     題材熱度為新聞則數的代理指標;分點(主力)資料${s.broker ? "已啟用" : "未啟用"}。
-    資料來源:證交所(法人/融資券/月營收/價量)+ Yahoo Finance(台股歷史/海外同業)+ Google News(題材新聞)。
+    資料來源:證交所(上市)+ 櫃買中心(上櫃)法人/融資券/價量、證交所月營收 + Yahoo Finance(台股歷史/海外同業)+ Google News(題材新聞)。
   </div>`;
 }
 
