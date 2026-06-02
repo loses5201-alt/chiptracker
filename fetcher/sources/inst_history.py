@@ -47,6 +47,8 @@ def _one_day(ds: str) -> dict | None:
     foreign = trust = dealer = 0.0
     for row in j["data"]:
         name = str(row[0])
+        if "合計" in name:  # 跳過彙總列,避免三大法人重複計入
+            continue
         diff = _num(row[_DIFF])
         if "外資" in name:
             foreign += diff

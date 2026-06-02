@@ -185,11 +185,6 @@ function card(s, idx) {
   </div>`;
 }
 
-function statRow(k, v, positive) {
-  const cls = positive === null ? "" : positive ? "up" : "down";
-  return `<div class="ms-row"><span class="ms-k">${k}</span><span class="ms-v ${cls}">${v}</span></div>`;
-}
-
 // 卡片指標小格(2×2,label 左 + 值右,不擠不換行)
 function statBox(k, v, positive) {
   const cls = positive === null ? "" : positive ? "up" : "down";
@@ -555,7 +550,6 @@ function streak(vals) {
 function marketPulse() {
   const p = META.market_pulse;
   if (!p) return "";
-  const yi = (v) => (v >= 0 ? "+" : "") + Math.round(v) + "億";
   const cls = (v) => (v >= 0 ? "up" : "down");
   const total = p.advancers + p.decliners + p.unchanged || 1;
   const chips = (p.hot_topics || []).map((t) =>
