@@ -314,3 +314,16 @@ body.dark .pm-trend.rise{color:#a78bfa}body.dark .pm-trend.fall{color:#38bdf8}
 body.dark .why{background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.25);color:#cbd5e1}
 body.dark .why b{color:#a5b4fc}
 body.dark .why-risk{color:#fcd34d}
+
+/* 三大法人 item(走勢 + 連買/連賣天數) */
+.pulse-inst{align-items:flex-start}
+.inst-item{display:flex;flex-direction:column;gap:1px;font-size:12px}
+.inst-item .ii-k{color:#94a3b8}
+.inst-item b{font-family:'JetBrains Mono',monospace;font-size:14px}
+.inst-item .mini-spark{width:56px;height:18px;margin:1px 0}
+.inst-streak{font-size:10px;font-weight:700;padding:0 5px;border-radius:4px;align-self:flex-start}
+.inst-streak.up{background:rgba(239,68,68,.12);color:#ef4444}
+.inst-streak.down{background:rgba(34,197,94,.12);color:#16a34a}
+body.dark .inst-item .ii-k{color:#94a3b8}
+body.dark .inst-streak.up{background:rgba(239,68,68,.2);color:#fb7185}
+body.dark .inst-streak.down{background:rgba(34,197,94,.2);color:#4ade80}

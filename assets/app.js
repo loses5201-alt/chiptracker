@@ -37,7 +37,7 @@ async function boot() {
     // 回測資料可能還不存在(剛起步),失敗不影響主畫面
     PERF = await fetch("data/performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     WREVIEW = await fetch("data/weight_review.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
-    MTREND = await fetch("data/margin_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    MTREND = await fetch("data/market_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -504,7 +504,20 @@ function miniSpark(vals, w = 116, h = 26) {
   return `<svg viewBox="0 0 ${w} ${h}" class="mini-spark" preserveAspectRatio="none"><polyline points="${pts.join(" ")}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
-// 大盤環境溫度計面板(讀 META.market_pulse + MTREND 融資週趨勢)。選股前先看順風逆風。
+// 連續同向天數(法人連買/連賣):從最新往回數連續正或負的天數
+function streak(vals) {
+  if (!vals || !vals.length) return { n: 0, dir: 0 };
+  const last = vals[vals.length - 1];
+  const dir = last > 0 ? 1 : last < 0 ? -1 : 0;
+  if (!dir) return { n: 0, dir: 0 };
+  let n = 0;
+  for (let i = vals.length - 1; i >= 0; i--) {
+    if ((dir > 0 && vals[i] > 0) || (dir < 0 && vals[i] < 0)) n++; else break;
+  }
+  return { n, dir };
+}
+
+// 大盤環境溫度計面板(三大法人走勢+連買天數、融資週趨勢)。選股前先看順風逆風。
 function marketPulse() {
   const p = META.market_pulse;
   if (!p) return "";
@@ -515,8 +528,18 @@ function marketPulse() {
     `<span class="pulse-topic">${t.name}${t.heat ? ` 🔥${t.heat}` : ""}</span>`).join("");
 
   // 融資餘額:優先用回填的週趨勢(總量+逐日走勢),沒有才退回當日變化
+  // 三大法人:當日金額 + 近10日走勢 + 連買/連賣天數(BFI82U 回填)
+  const itr = MTREND && MTREND.inst ? MTREND.inst : [];
+  const instItem = (label, key, fallback) => {
+    const arr = itr.map((d) => d[key]);
+    const cur = arr.length ? arr[arr.length - 1] : fallback;
+    const st = streak(arr);
+    const stTxt = st.n >= 2 ? `<span class="inst-streak ${st.dir > 0 ? "up" : "down"}">${st.dir > 0 ? "連買" : "連賣"}${st.n}</span>` : "";
+    return `<div class="inst-item"><span class="ii-k">${label}</span><b class="${cur >= 0 ? "up" : "down"}">${cur >= 0 ? "+" : ""}${Math.round(cur)}億</b>${arr.length >= 2 ? miniSpark(arr, 56, 18) : ""}${stTxt}</div>`;
+  };
+
   let marginRow;
-  const mt = MTREND && MTREND.days && MTREND.days.length >= 2 ? MTREND.days : null;
+  const mt = MTREND && MTREND.margin && MTREND.margin.length >= 2 ? MTREND.margin : null;
   if (mt) {
     const arr = mt.map((d) => d.margin_lots);
     const cur = arr[arr.length - 1], first = arr[0];
@@ -545,9 +568,9 @@ function marketPulse() {
           <span class="down">▼ ${p.decliners}</span> · 上漲廣度 <b>${p.breadth_pct}%</b></div>
       </div>
       <div class="pulse-inst">
-        <span>外資 <b class="${cls(p.inst_foreign)}">${yi(p.inst_foreign)}</b></span>
-        <span>投信 <b class="${cls(p.inst_trust)}">${yi(p.inst_trust)}</b></span>
-        <span>自營 <b class="${cls(p.inst_dealer)}">${yi(p.inst_dealer)}</b></span>
+        ${instItem("外資", "foreign_yi", p.inst_foreign)}
+        ${instItem("投信", "trust_yi", p.inst_trust)}
+        ${instItem("自營", "dealer_yi", p.inst_dealer)}
       </div>
       ${marginRow}
       <div class="pulse-topics">強勢題材 ${chips}</div>

@@ -23,6 +23,7 @@ from .sources.news import NewsSource
 from .sources.price_history import PriceHistorySource
 from . import sectors, scoring, market_pulse
 from .sources.margin_history import fetch_trend as fetch_margin_trend
+from .sources.inst_history import fetch_trend as fetch_inst_trend
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -198,6 +199,19 @@ def main() -> int:
     ]
     (snap_dir / f"{trading_date}.json").write_text(
         json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+    # 大盤趨勢(融資 + 三大法人),回填近 10 交易日 → 趨勢化判讀(不必累積)
+    try:
+        mtrend = fetch_margin_trend(10)
+    except Exception as e:  # noqa: BLE001 — 趨勢失敗不影響主資料
+        mtrend = []
+        print(f"  融資趨勢失敗(略過):{e}")
+    try:
+        itrend = fetch_inst_trend(10)
+    except Exception as e:  # noqa: BLE001
+        itrend = []
+        print(f"  法人趨勢失敗(略過):{e}")
+    inst_today = itrend[-1] if itrend else {}
+
     meta = {
         "updated_at": datetime.now(TPE).isoformat(timespec="seconds"),
         "trading_date": trading_date,
@@ -214,21 +228,16 @@ def main() -> int:
         "topic_momentum": topic_mom,
         "topic_heat": {n: d["heat"] for n, d in heat.items()},
         "yahoo_ok": len(yh),
-        "market_pulse": market_pulse.compute(quotes, inst, margin, heat, topic_mom),
+        "market_pulse": market_pulse.compute(quotes, margin, heat, topic_mom, inst_today),
     }
     (DATA / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    # 大盤融資餘額週趨勢:單日數字無意義,看「總量 + 逐日增減」才有判讀價值。
-    # 證交所信用交易統計可指定日期 → 直接回填近 10 交易日,不必從零累積。
-    try:
-        mtrend = fetch_margin_trend(10)
-    except Exception as e:  # noqa: BLE001 — 趨勢失敗不影響主資料
-        mtrend = []
-        print(f"  融資趨勢失敗(略過):{e}")
-    (DATA / "margin_trend.json").write_text(
-        json.dumps({"updated": datetime.now(TPE).isoformat(timespec="seconds"), "days": mtrend},
+    # 大盤趨勢檔(融資 + 三大法人),供溫度計畫週趨勢
+    (DATA / "market_trend.json").write_text(
+        json.dumps({"updated": datetime.now(TPE).isoformat(timespec="seconds"),
+                    "margin": mtrend, "inst": itrend},
                    ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"  融資趨勢 {len(mtrend)} 日")
+    print(f"  大盤趨勢:融資 {len(mtrend)} 日 / 法人 {len(itrend)} 日")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")

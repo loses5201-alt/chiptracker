@@ -1,15 +1,15 @@
 """
-大盤環境溫度計 — 對「全市場」原始資料做彙整,產出今日盤勢概況。
+大盤環境溫度計 — 對「全市場」資料做彙整,產出今日盤勢概況。
 
 用途:選股前先看市場是順風還逆風。個股再好,大盤大跌時短線也難做。
-輸入:build 撈到的全市場 quotes/inst/margin(上市+上櫃合併後)+ 題材熱度/動能。
+輸入:全市場 quotes / margin(上市+上櫃)+ 題材熱度/動能 + 當日三大法人(BFI82U 官方金額)。
 輸出:寫進 meta.json 的 market_pulse,前端「今日盤勢」面板顯示。
 
 各指標說明:
   漲跌家數   依當日漲跌價 change 計;紅多(漲>跌)=偏多頭氣氛
-  三大法人   全市場淨買賣超「估算金額」= Σ(該股淨買賣超股數 × 收盤價),單位億元
-             (官方以成交均價計,這裡用收盤價近似,看方向與量級足矣)
-  融資增減   全市場融資餘額變化(張)+ 融資增加家數;爆增常代表散戶追高
+  三大法人   用 BFI82U 官方買賣金額(億元)。比舊版「Σ個股淨股數×收盤」估算準確
+             (實測投信方向都可能相反),且可回填趨勢(見 sources/inst_history.py)
+  融資增減   全市場融資餘額變化(張)+ 融資增加家數
   強勢題材   題材熱度(新聞則數)+ 海外同業動能 綜合排序前三
   綜合判讀   上漲家數佔比 + 法人是否站買方 → 順風 / 中性 / 逆風
 """
@@ -23,7 +23,9 @@ def _topic_score(name: str, heat: dict, mom: dict) -> float:
     return h * 2 + m * 1.5
 
 
-def compute(quotes: dict, inst: dict, margin: dict, heat: dict, mom: dict) -> dict:
+def compute(quotes: dict, margin: dict, heat: dict, mom: dict, inst_today: dict | None = None) -> dict:
+    inst_today = inst_today or {}
+
     # 1. 漲跌家數(只計有成交的個股)
     up = down = flat = 0
     for q in quotes.values():
@@ -37,17 +39,11 @@ def compute(quotes: dict, inst: dict, margin: dict, heat: dict, mom: dict) -> di
         else:
             flat += 1
 
-    # 2. 三大法人淨買賣超估算金額(億元):Σ(淨股數 × 收盤價)
-    foreign = trust = dealer = 0.0
-    for code, i in inst.items():
-        c = quotes.get(code, {}).get("close", 0)
-        if c <= 0:
-            continue
-        foreign += i.get("foreign", 0) * c
-        trust += i.get("trust", 0) * c
-        dealer += i.get("dealer", 0) * c
-    to_e = lambda x: round(x / 1e8, 1)  # 元 → 億元
-    inst_total_yuan = foreign + trust + dealer
+    # 2. 三大法人買賣超(億元,BFI82U 官方金額)
+    foreign = inst_today.get("foreign_yi", 0.0)
+    trust = inst_today.get("trust_yi", 0.0)
+    dealer = inst_today.get("dealer_yi", 0.0)
+    inst_total = round(foreign + trust + dealer, 1)
 
     # 3. 融資餘額變化(張)與融資增加家數
     mg_chg = 0.0
@@ -66,10 +62,10 @@ def compute(quotes: dict, inst: dict, margin: dict, heat: dict, mom: dict) -> di
     ]
 
     # 5. 綜合判讀:漲跌廣度 + 法人方向
-    breadth = up / (up + down) if (up + down) else 0.5  # 上漲佔比
-    if breadth >= 0.6 and inst_total_yuan > 0:
+    breadth = up / (up + down) if (up + down) else 0.5
+    if breadth >= 0.6 and inst_total > 0:
         mood, mood_txt = "tailwind", "順風"
-    elif breadth <= 0.4 and inst_total_yuan < 0:
+    elif breadth <= 0.4 and inst_total < 0:
         mood, mood_txt = "headwind", "逆風"
     else:
         mood, mood_txt = "neutral", "中性"
@@ -77,10 +73,8 @@ def compute(quotes: dict, inst: dict, margin: dict, heat: dict, mom: dict) -> di
     return {
         "advancers": up, "decliners": down, "unchanged": flat,
         "breadth_pct": round(breadth * 100, 1),
-        "inst_foreign": to_e(foreign),
-        "inst_trust": to_e(trust),
-        "inst_dealer": to_e(dealer),
-        "inst_total": to_e(inst_total_yuan),
+        "inst_foreign": foreign, "inst_trust": trust,
+        "inst_dealer": dealer, "inst_total": inst_total,
         "margin_chg_lots": round(mg_chg, 0),
         "margin_up_count": mg_up,
         "hot_topics": hot_topics,
