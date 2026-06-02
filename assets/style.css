@@ -68,10 +68,16 @@ body{
 .pill.watch{background:rgba(100,116,139,.14);color:#64748b}
 
 /* 卡片中段:雷達圖 + 數據 */
-.card-mid{display:flex;align-items:center;gap:8px;margin:6px 0 4px}
+.card-mid{display:flex;align-items:center;justify-content:center;margin:4px 0 0}
+.mid-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 0}
+.ms-box{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:9px;padding:6px 11px}
+.ms-box .ms-k{font-size:12px;color:#94a3b8}
+.ms-box .ms-v{font-size:13.5px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.ms-box .ms-v.up{color:#ef4444}.ms-box .ms-v.down{color:#22c55e}
+body.dark .ms-box{background:rgba(148,163,184,.1)}
+body.dark .ms-box .ms-v.down{color:#4ade80}
 .radar-wrap{flex-shrink:0}
 .radar{display:block}
-.mid-stats{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
 .ms-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 10px;background:#f8fafc;border-radius:9px}
 .ms-k{color:#94a3b8}
 .ms-v{font-weight:700;font-family:'JetBrains Mono',monospace}

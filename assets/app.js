@@ -166,13 +166,13 @@ function card(s, idx) {
       </div>
     </div>
     <div class="card-mid">
-      <div class="radar-wrap">${radar(s, 150)}</div>
-      <div class="mid-stats">
-        ${s.yoy != null ? statRow("月營收", (s.yoy >= 0 ? "+" : "") + s.yoy + "%", s.yoy >= 0) : ""}
-        ${s.ov != null ? statRow("海外同業", (s.ov >= 0 ? "+" : "") + s.ov + "%", s.ov >= 0) : ""}
-        ${statRow("RSI", s.rsi, null)}
-        ${statRow("區間位置", s.pos, null)}
-      </div>
+      <div class="radar-wrap">${radar(s, 158)}</div>
+    </div>
+    <div class="mid-stats">
+      ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
+      ${statBox("海外", s.ov != null ? (s.ov >= 0 ? "+" : "") + s.ov + "%" : "—", s.ov != null ? s.ov >= 0 : null)}
+      ${statBox("RSI", s.rsi, null)}
+      ${statBox("位置", s.pos, null)}
     </div>
     <div class="badges">${badges}</div>
     ${newsLine}
@@ -183,6 +183,12 @@ function card(s, idx) {
 function statRow(k, v, positive) {
   const cls = positive === null ? "" : positive ? "up" : "down";
   return `<div class="ms-row"><span class="ms-k">${k}</span><span class="ms-v ${cls}">${v}</span></div>`;
+}
+
+// 卡片指標小格(2×2,label 左 + 值右,不擠不換行)
+function statBox(k, v, positive) {
+  const cls = positive === null ? "" : positive ? "up" : "down";
+  return `<div class="ms-box"><span class="ms-k">${k}</span><span class="ms-v ${cls}">${v}</span></div>`;
 }
 
 function recColor(rec) {
