@@ -27,6 +27,7 @@ let WREVIEW = null;
 let view = "entry";
 
 async function boot() {
+  setupTheme();
   try {
     [STOCKS, META] = await Promise.all([
       fetch("data/stocks.json?_=" + Date.now()).then((r) => r.json()),
@@ -504,6 +505,19 @@ function footNote() {
     題材熱度為新聞則數的代理指標;分點(主力)資料${s.broker ? "已啟用" : "未啟用"}。
     資料來源:證交所(上市)+ 櫃買中心(上櫃)法人/融資券/價量、證交所月營收 + Yahoo Finance(台股歷史/海外同業)+ Google News(題材新聞)。
   </div>`;
+}
+
+// 深色 / 淺色切換,選擇記在 localStorage(body 開頭的 inline script 負責首載防閃)
+function setupTheme() {
+  const btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  const sync = () => { btn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙"; };
+  sync();
+  btn.addEventListener("click", () => {
+    document.body.classList.toggle("dark");
+    localStorage.setItem("ct-theme", document.body.classList.contains("dark") ? "dark" : "light");
+    sync();
+  });
 }
 
 boot();
