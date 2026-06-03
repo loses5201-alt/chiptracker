@@ -145,49 +145,65 @@ def score_momentum(closes: list[float], volume: float, avg_vol: float | None) ->
 
 
 def score_short(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
-                fund: dict | None) -> tuple[int, list[str]]:
+                fund: dict | None, topic: str | None = None, topic_heat: int = 0) -> tuple[int, list[str]]:
     """
-    做空評分(0-100,越高越適合放空)。反向邏輯:高檔回落 + 業績轉弱 + 法人出貨。
-    ⚠️ 做空風險高(軋空、無限損失),此為訊號非建議,務必設停損。
+    做空評分(0-100)。鎖定「大牛市跟風假漲」:乖離過高 + 實質營收沒跟上 + 無題材 + 法人出貨。
+    ⚠️ 做空風險高(軋空、損失無上限),此為訊號非建議,務必設停損。
     """
     s, reasons = 0, []
-    # 1. 高檔過熱回落(技術,0-38):漲多了、過熱、開始轉弱
     rsi = ind.rsi(closes)
     pos = ind.position_in_range(closes, 20)
     ma5, ma20 = ind.sma(closes, 5), ind.sma(closes, 20)
     last = closes[-1] if closes else 0
-    if pos is not None and pos >= 85:
-        s += 12
-        reasons.append(f"高檔(區間{pos})")
-    if rsi is not None and rsi >= 78:
-        s += 12
-        reasons.append(f"超買(RSI{rsi})")
-    if ma5 is not None and last and last < ma5:
+    bias20 = ((last - ma20) / ma20 * 100) if (ma20 and last) else 0   # 乖離率(對月線)
+    yoy = fund.get("yoy", 0) if fund else 0
+
+    # 1. 乖離率過高 — 漲過頭(0-14)
+    if bias20 >= 20:
+        s += 14
+        reasons.append(f"乖離過高(+{bias20:.0f}%)")
+    elif bias20 >= 12:
         s += 8
-        reasons.append("跌破5日線")
-    if ma5 is not None and ma20 is not None and ma5 < ma20:
-        s += 6
-        reasons.append("均線下彎")
-    # 2. 法人出貨(0-25):三大法人賣超佔成交量比
+        reasons.append(f"乖離偏高(+{bias20:.0f}%)")
+    # 2. 跟風假漲 — 漲多但實質營收沒跟上(0-22)★核心
+    if bias20 >= 12 and yoy < 10:
+        s += 22
+        reasons.append("漲多但營收未跟上")
+    elif yoy < 0:
+        s += 12
+        reasons.append(f"營收年減{yoy:.0f}%")
+    # 3. 無題材支撐 — 純資金跟風(0-12)★核心
+    if not topic:
+        s += 8
+        reasons.append("無題材支撐")
+    elif topic_heat < 3:
+        s += 5
+        reasons.append("題材退燒")
+    # 4. 高檔過熱(0-16)
+    if pos is not None and pos >= 90:
+        s += 8
+        reasons.append(f"高檔(區間{pos})")
+    if rsi is not None and rsi >= 80:
+        s += 8
+        reasons.append(f"超買(RSI{rsi})")
+    # 5. 法人出貨(0-18):三大法人賣超佔成交量比
     if inst and vol > 0:
         r = inst.get("total", 0) / vol
         if r < 0:
-            s += min(25, round(-r * 250))
+            s += min(18, round(-r * 180))
             reasons.append("法人賣超")
-    # 3. 業績轉弱(0-25):月營收年減
-    if fund:
-        yoy = fund.get("yoy", 0)
-        if yoy < 0:
-            s += min(25, round(-yoy * 0.6))
-            reasons.append(f"營收年減{yoy:.0f}%")
-    # 4. 融資套牢 / 融券(0-12):融資增+法人賣=散戶套頂;融券減=空方少易跌
-    if mg:
-        if mg.get("margin_bal", 0) - mg.get("margin_prev", 0) > 0 and inst.get("total", 0) < 0:
-            s += 8
-            reasons.append("融資套牢")
-        if mg.get("short_bal", 0) < mg.get("short_prev", 0):
-            s += 4
-    return min(100, s), reasons[:4]
+    # 6. 技術轉弱(0-10)
+    if ma5 is not None and last and last < ma5:
+        s += 5
+        reasons.append("跌破5日線")
+    if ma5 is not None and ma20 is not None and ma5 < ma20:
+        s += 5
+        reasons.append("均線下彎")
+    # 7. 融資套牢(0-6):融資增 + 法人賣 = 散戶套在頂部
+    if mg and mg.get("margin_bal", 0) - mg.get("margin_prev", 0) > 0 and inst.get("total", 0) < 0:
+        s += 6
+        reasons.append("融資套牢")
+    return min(100, s), reasons[:5]
 
 
 def short_grade(score: int) -> str:

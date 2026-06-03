@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 TOP_N = 40
 CANDIDATES = 120
-SHORT_CANDIDATES = 80   # 做空候選池
+SHORT_CANDIDATES = 100  # 做空候選池(放寬納入「業績未明顯成長」的跟風股)
 SHORT_TOP = 30          # 做空清單顯示數
 HISTORY_CAP = 60
 CHART_DAYS = 30
@@ -181,8 +181,9 @@ def main() -> int:
         f = funds.get(code)
         itotal = inst.get(code, {}).get("total", 0)
         yoy = f["yoy"] if f else 0
-        if yoy < 0 or itotal < 0:
-            sb = max(0, -yoy) * 0.6 + (max(0, -itotal / q["volume"]) * 200 if q["volume"] > 0 else 0)
+        # 做空候選:實質營收未明顯成長(yoy<10)或法人賣超 + 有量(跟風假漲常在此)
+        if yoy < 10 or itotal < 0:
+            sb = max(0, 12 - yoy) * 0.4 + (max(0, -itotal / q["volume"]) * 200 if q["volume"] > 0 else 0)
             short_cand.append((code, q, sb))
     short_cand.sort(key=lambda x: x[2], reverse=True)
     short_cand = short_cand[:SHORT_CANDIDATES]
@@ -219,8 +220,10 @@ def main() -> int:
         closes = yh[code]["closes"] if code in yh else hist["closes"].get(code, [q["close"]])
         vols = yh[code]["vols"] if code in yh else hist["vols"].get(code, [])
         avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
+        s_topic, _stm = sectors.best_topic_for(code, topic_mom, heat)
+        s_heat = heat.get(s_topic, {}).get("heat", 0) if s_topic else 0
         ss, sreasons = scoring.score_short(inst.get(code, {}), margin.get(code, {}),
-                                           closes, q.get("volume", 0), avg_vol, funds.get(code))
+                                           closes, q.get("volume", 0), avg_vol, funds.get(code), s_topic, s_heat)
         close = q.get("close", 0)
         shorts.append({
             "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
