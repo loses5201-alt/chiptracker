@@ -32,6 +32,8 @@ TOP_N = 40
 CANDIDATES = 120
 SHORT_CANDIDATES = 100  # 做空候選池(放寬納入「業績未明顯成長」的跟風股)
 SHORT_TOP = 30          # 做空清單顯示數
+STEALTH_CANDIDATES = 100  # 主力潛伏候選池(法人吃貨的股)
+STEALTH_TOP = 30          # 主力潛伏清單顯示數
 HISTORY_CAP = 60
 CHART_DAYS = 30
 TPE = timezone(timedelta(hours=8))
@@ -192,12 +194,23 @@ def main() -> int:
             short_cand.append((code, q, sb))
     short_cand.sort(key=lambda x: x[2], reverse=True)
     short_cand = short_cand[:SHORT_CANDIDATES]
+    # 主力潛伏候選:法人買超(大戶吃貨)+ 有量;階段2 再用 stealth_score 篩低基期/未發動
+    stealth_cand = []
+    for code, q in quotes.items():
+        if q.get("close", 0) <= 0 or q.get("volume", 0) <= 0 or code.startswith("00"):
+            continue
+        itotal = inst.get(code, {}).get("total", 0)
+        if itotal > 0:
+            stealth_cand.append((code, q, itotal / q["volume"]))
+    stealth_cand.sort(key=lambda x: x[2], reverse=True)
+    stealth_cand = stealth_cand[:STEALTH_CANDIDATES]
     print(f"  全市場評分 {len(all_scored)} / 做多候選 {len(cand)} / 做空候選 {len(short_cand)}")
 
     print("階段2:回補候選股 Yahoo 歷史 → 算技術面…")
     _mkt = lambda c: "tpex" if c in tpex_codes else "twse"
     _fetch_set = {c[0]: _mkt(c[0]) for c in cand}
-    _fetch_set.update({c[0]: _mkt(c[0]) for c in short_cand})  # 做多+做空候選合併去重
+    _fetch_set.update({c[0]: _mkt(c[0]) for c in short_cand})   # 做多+做空候選合併去重
+    _fetch_set.update({c[0]: _mkt(c[0]) for c in stealth_cand})  # + 潛伏候選
     yh = hist_src.fetch(list(_fetch_set.items()))
     print(f"  Yahoo 成功 {len(yh)}/{len(_fetch_set)} 檔(做多+做空候選)")
 
@@ -301,9 +314,11 @@ def main() -> int:
     print(f"  大盤趨勢:融資 {len(mtrend)} 日 / 法人 {len(itrend)} 日")
 
     # 個股籌碼歷史(top 上市股近10交易日法人/融資趨勢,延續「看一段時間」到個股)
-    top_pairs = [(r["c"], r["mkt"]) for r in top]
+    chip_targets = {r["c"]: r["mkt"] for r in top}
+    for code, q, _ in stealth_cand:
+        chip_targets[code] = _mkt(code)   # 潛伏候選也要法人連買天數
     try:
-        chips = fetch_stock_chips(top_pairs, 10)
+        chips = fetch_stock_chips(list(chip_targets.items()), 10)
     except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
         chips = {}
         print(f"  個股籌碼失敗(略過):{e}")
@@ -320,6 +335,31 @@ def main() -> int:
         ch["cost"] = round(num / den, 2) if den else None
     (DATA / "stock_chips.json").write_text(json.dumps(chips, ensure_ascii=False), encoding="utf-8")
     print(f"  個股籌碼 {len(chips)} 檔")
+
+    # 主力潛伏清單:大戶吃貨 + 低基期 + 還沒發動(跟著大戶提前布局,app 核心)
+    stealth = []
+    for code, q, _ in stealth_cand:
+        closes = yh[code]["closes"] if code in yh else hist["closes"].get(code, [q["close"]])
+        vols = yh[code]["vols"] if code in yh else hist["vols"].get(code, [])
+        avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
+        streak = chips.get(code, {}).get("inst_buy_streak", 0)
+        st, sr = scoring.score_stealth(inst.get(code, {}), margin.get(code, {}),
+                                       closes, q.get("volume", 0), avg_vol, funds.get(code), streak)
+        close = q.get("close", 0)
+        stealth.append({
+            "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
+            "score": st, "rec": scoring.stealth_grade(st), "close": close,
+            "yoy": round(funds[code]["yoy"], 1) if funds.get(code) else None,
+            "reason": sr or ["法人潛伏"], "closes": closes[-CHART_DAYS:],
+            "entry": f"{close*0.98:.1f}~{close*1.02:.1f}" if close else "—",
+            "stop": f"{close*0.93:.1f}" if close else "—",   # 潛伏停損較寬(盤整)
+            "t1": f"{close*1.10:.1f}" if close else "—",     # 發動後目標較遠
+            "t2": f"{close*1.20:.1f}" if close else "—",
+        })
+    stealth.sort(key=lambda r: r["score"], reverse=True)
+    stealth = stealth[:STEALTH_TOP]
+    (DATA / "stealth.json").write_text(json.dumps(stealth, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"  主力潛伏 {len(stealth)} 檔")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")

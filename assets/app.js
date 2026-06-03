@@ -11,8 +11,10 @@ const SCORES = [
 ];
 const REC_TEXT = { strong: "強力建議", mid: "可留意", watch: "觀察" };
 const SHORT_TEXT = { strong: "強烈做空", mid: "留意做空", watch: "觀察" };
+const STEALTH_TEXT = { strong: "強力潛伏", mid: "潛伏中", watch: "觀察" };
 const TABS = [
   { k: "entry", t: "進場建議" },
+  { k: "stealth", t: "主力潛伏" },
   { k: "foreign", t: "法人動向" },
   { k: "fund", t: "基本面" },
   { k: "topic", t: "題材熱度" },
@@ -32,6 +34,7 @@ let CHIPS = null;
 let HPERF = null;
 let ALL_STOCKS = null;
 let SHORTS = null;
+let STEALTH = null;
 let view = "entry";
 
 async function boot() {
@@ -50,6 +53,7 @@ async function boot() {
     HPERF = await fetch("data/historical_performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     ALL_STOCKS = await fetch("data/all_stocks.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     SHORTS = await fetch("data/shorts.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    STEALTH = await fetch("data/stealth.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -92,6 +96,7 @@ function render() {
   if (view === "overview") return renderOverview(box);
   if (view === "topic") return renderTopic(box);
   if (view === "backtest") return renderBacktest(box);
+  if (view === "stealth") return renderStealth(box);
   if (view === "short") return renderShorts(box);
   if (view === "watch") return renderWatchlist(box);
   let list = [...STOCKS];
@@ -708,6 +713,70 @@ function renderSkeleton() {
   const sk = `<div class="sk-card"><div class="sk-line w60"></div><div class="sk-line w40"></div>
     <div class="sk-radar"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>`;
   document.getElementById("content").innerHTML = `<div class="grid">${sk.repeat(6)}</div>`;
+}
+
+// ── 主力潛伏(起漲前布局:大戶吃貨、還沒發動)──
+function stealthCard(s, idx) {
+  const badges = (s.reason || []).map((r) => `<span class="badge stealth">${r}</span>`).join("");
+  return `<div class="card stealth" data-code="${s.c}" style="--i:${idx}">
+    <div class="rank-badge stealth">${idx + 1}</div>
+    <div class="card-top">
+      <div class="ct-left">
+        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
+        <div class="px-row"><span class="stock-px">${s.close || "—"}</span></div>
+      </div>
+      <div class="ct-right">
+        <div class="score-ring stealth"><span>${s.score}</span><small>伏</small></div>
+        <div class="pill stealth">${STEALTH_TEXT[s.rec]}</div>
+      </div>
+    </div>
+    <div class="mid-stats">
+      ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
+      ${statBox("現價", s.close || "—", null)}
+    </div>
+    <div class="badges">${badges}</div>
+    <div class="short-trade">布局 ${s.entry} · 停損 ${s.stop} · 目標 ${s.t1}/${s.t2}</div>
+    <div class="card-hint">點擊看走勢與布局計畫 ›</div>
+  </div>`;
+}
+
+function renderStealth(box) {
+  if (!STEALTH || !STEALTH.length) {
+    box.innerHTML = '<div class="empty" style="padding:50px">今日無明顯潛伏標的(法人尚未明顯在低基期吃貨)</div>' + footNote();
+    return;
+  }
+  const intro = `<div class="stealth-intro"><b>🎯 主力潛伏(起漲前布局)</b> — 法人默默吃貨、股價還在低基期沒發動,跟著大戶提前埋伏。<b>這是「跟著大戶賺大錢」的核心</b>。需耐心(可能先盤整),此為程式訊號、非投資建議,務必停損。</div>`;
+  box.innerHTML = intro + `<div class="grid">${STEALTH.map((s, i) => stealthCard(s, i)).join("")}</div>` + footNote();
+  box.querySelectorAll(".card").forEach((el) =>
+    el.addEventListener("click", () => openStealthDetail(el.dataset.code)));
+}
+
+function openStealthDetail(code) {
+  const s = STEALTH.find((x) => x.c === code);
+  if (!s) return;
+  document.getElementById("modal-body").innerHTML = `
+    <div class="m-head">
+      <div>
+        <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
+        <div class="m-px">${s.close || "—"} <span class="pill stealth">${STEALTH_TEXT[s.rec]} ${s.score}分</span></div>
+      </div>
+      <button class="m-close" id="m-close">✕</button>
+    </div>
+    <div class="note" style="border-left:4px solid #f0b429">🎯 主力潛伏:法人默默吃貨、股價還沒發動。提前布局需耐心(可能先盤整),非投資建議,務必停損。</div>
+    <div class="m-section">潛伏理由</div>
+    <div class="m-reason">${(s.reason || []).map((r) => `<span class="badge stealth">${r}</span>`).join("")}</div>
+    ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
+    <div class="m-section">近 ${s.closes ? s.closes.length : 0} 日走勢</div>
+    ${sparkline(s.closes)}
+    <div class="m-section">參考布局進出場(程式估算,非建議)</div>
+    <div class="trade-grid">
+      <div class="tg-box"><div class="tg-k">布局區</div><div class="tg-v">${s.entry}</div></div>
+      <div class="tg-box down"><div class="tg-k">停損</div><div class="tg-v">${s.stop}</div></div>
+      <div class="tg-box up"><div class="tg-k">目標+10%</div><div class="tg-v">${s.t1}</div></div>
+      <div class="tg-box up"><div class="tg-k">目標+20%</div><div class="tg-v">${s.t2}</div></div>
+    </div>`;
+  document.getElementById("modal").classList.add("show");
+  document.getElementById("m-close").addEventListener("click", closeModal);
 }
 
 // ── 做空標的(高檔回落 / 業績轉弱)──

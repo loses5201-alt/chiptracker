@@ -215,6 +215,60 @@ def short_grade(score: int) -> str:
     return "watch"
 
 
+def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
+                  fund: dict | None, inst_streak: int = 0) -> tuple[int, list[str]]:
+    """
+    主力潛伏(起漲前)— 跟著大戶提前布局的核心評分。
+    抓「大戶/法人偷偷吃貨、但股價還沒發動」的股,提前進場。與動能選股相反:懲罰高位/過熱/漲多。
+    ⚠️ 仍是訊號非建議;潛伏股可能盤更久或不發動,需耐心與停損。
+    """
+    s, reasons = 0, []
+    pos = ind.position_in_range(closes, 60)   # 60 日區間看基期高低
+    rsi = ind.rsi(closes)
+    ma20 = ind.sma(closes, 20)
+    last = closes[-1] if closes else 0
+    bias = ((last - ma20) / ma20 * 100) if (ma20 and last) else 0
+    itotal = inst.get("total", 0) if inst else 0
+
+    # 1. 法人吸籌(核心):默默買 + 連續買 = 大戶在布局
+    if vol > 0 and itotal > 0:
+        s += min(22, round(itotal / vol * 220)); reasons.append("法人吃貨")
+    if inst_streak >= 3:
+        s += min(16, inst_streak * 3); reasons.append(f"法人連買{inst_streak}天")
+    # 2. 低基期:還沒漲 = 位置低 + 乖離小
+    if pos is not None:
+        if pos <= 35:
+            s += 20; reasons.append(f"低基期(位置{pos})")
+        elif pos <= 55:
+            s += 11; reasons.append(f"中低基期(位置{pos})")
+        elif pos >= 80:
+            s -= 12   # 高位追高,扣分
+    if abs(bias) <= 6:
+        s += 8; reasons.append("貼近均線未漲多")
+    elif bias >= 15:
+        s -= 8        # 乖離過大(已漲多)扣分
+    # 3. 籌碼沉澱:散戶退場(融資減)+ 法人進 = 籌碼變乾淨
+    if mg and itotal > 0 and mg.get("margin_bal", 0) - mg.get("margin_prev", 0) < 0:
+        s += 12; reasons.append("散戶退場法人進")
+    # 4. 還沒發動:RSI 中性 + 量縮(沒被市場發現)
+    if rsi is not None:
+        if 42 <= rsi <= 62:
+            s += 8; reasons.append("動能未過熱")
+        elif rsi > 72:
+            s -= 8
+    if avg_vol and vol < avg_vol * 1.2 and itotal > 0:
+        s += 6; reasons.append("量縮默吃")
+    return max(0, min(100, s)), reasons[:5]
+
+
+def stealth_grade(score: int) -> str:
+    if score >= 55:
+        return "strong"
+    if score >= 40:
+        return "mid"
+    return "watch"
+
+
 def grade(score: int) -> str:
     """總分(滿分 100)轉建議強度。"""
     if score >= 70:
