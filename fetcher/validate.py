@@ -95,10 +95,18 @@ def main() -> int:
     print("=== ChipTracker 資料來源驗證 ===")
     twse, tpex = TwseSource(), TpexSource()
 
-    print("抓取 TWSE(上市)…")
-    tq, ti, tm = twse.daily_quotes(), twse.institutional(), twse.margin()
-    print("抓取 TPEX(上櫃)…")
-    pq, pi, pm = tpex.daily_quotes(), tpex.institutional(), tpex.margin()
+    # 來源抓取包 try:暫時性失敗(timeout/IncompleteRead)不該擋掉整天更新 —
+    # 那不是「資料壞」而是「暫時抓不到」,交由 build 步驟自行重試;
+    # validate 只在「抓到資料但檢查不過」(恆等式/筆數異常)時才中斷。
+    try:
+        print("抓取 TWSE(上市)…")
+        tq, ti, tm = twse.daily_quotes(), twse.institutional(), twse.margin()
+        print("抓取 TPEX(上櫃)…")
+        pq, pi, pm = tpex.daily_quotes(), tpex.institutional(), tpex.margin()
+    except Exception as e:  # noqa: BLE001 — 來源暫時抽風
+        print(f"⚠️ 來源暫時無法取得:{e}")
+        print("→ 不中斷流程,交由 build 自行重試(build 也失敗才代表真的抓不到)。")
+        return 0
 
     results: list[Check] = []
     results += check_source("twse", tq, ti, tm, SPOT["twse"])

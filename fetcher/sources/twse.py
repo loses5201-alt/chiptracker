@@ -50,7 +50,7 @@ def _openapi(path: str, tries: int = 4):
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=45) as r:
                 if not r.geturl().rstrip("/").endswith(path.rstrip("/")):
                     raise ValueError("redirected away (暫時性 302)")
                 return json.loads(r.read().decode("utf-8"))
