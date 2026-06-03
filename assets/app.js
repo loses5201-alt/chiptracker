@@ -348,6 +348,8 @@ function openDetail(code) {
     ${newsBlock}
     <div class="m-section">籌碼與基本面</div>
     <div class="dl"><span class="k">三大法人</span><span class="v">${s.smart}</span></div>
+    <div class="dl"><span class="k">外資投信</span><span class="v">${s.align || "—"}</span></div>
+    ${s.conc != null ? `<div class="dl"><span class="k">法人吃貨佔量</span><span class="v ${s.conc >= 0 ? "up" : "down"}">${s.conc >= 0 ? "+" : ""}${s.conc}%</span></div>` : ""}
     ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
     ${s.ov != null ? `<div class="dl"><span class="k">海外同業(5日)</span><span class="v ${s.ov >= 0 ? "up" : "down"}">${s.ov >= 0 ? "+" : ""}${s.ov}%</span></div>` : ""}
     <div class="dl"><span class="k">RSI</span><span class="v">${s.rsi}</span></div>
@@ -696,6 +698,7 @@ function marketPulse() {
       </div>
       ${marginRow}
       <div class="pulse-topics">強勢題材 ${chips}</div>
+      ${META.quarter_end ? `<div class="pulse-qe">📅 季底投信作帳期 — 留意投信連買的中型股</div>` : ""}
     </div>
   </div>`;
 }

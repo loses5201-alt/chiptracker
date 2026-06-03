@@ -99,6 +99,9 @@ def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols, mark
     reasons = (bs["notes"] + ([n6] if n6 else []))[:4]
     close = q.get("close", 0)
 
+    fg, tr = inst.get("foreign", 0), inst.get("trust", 0)
+    align = "外資投信同買" if fg > 0 and tr > 0 else "外資投信同賣" if fg < 0 and tr < 0 else "外資投信分歧"
+    conc = round(inst.get("total", 0) / volume * 100, 2) if volume > 0 else 0  # 法人買超佔當日量%(吃貨集中度)
     smart = []
     if inst.get("foreign"):
         smart.append(f"外資{'+' if inst['foreign']>=0 else ''}{fmt_lots(inst['foreign'])}")
@@ -114,7 +117,7 @@ def finalize(code, q, inst, fund, topic, tmom, heat_data, bs, closes, vols, mark
         "ov": round(tmom, 1) if topic else None,
         "heat": heat_data.get("heat", 0) if topic else 0,
         "news": heat_data.get("titles", []) if topic else [],
-        "smart": "、".join(smart) or "—",
+        "smart": "、".join(smart) or "—", "align": align, "conc": conc,
         "reason": reasons or ["資料累積中"],
         "entry": f"{close*0.99:.1f}~{close*1.01:.1f}" if close else "—",
         "stop": f"{close*0.95:.1f}" if close else "—",
@@ -152,6 +155,8 @@ def main() -> int:
     print(f"  月營收 {len(funds)} / 海外 {len(ov_prices)} / 新聞熱題 {[h[0] for h in hot]}")
 
     trading_date = twse.trading_date or datetime.now(TPE).strftime("%Y%m%d")
+    _now = datetime.now(TPE)
+    quarter_end = _now.month in (3, 6, 9, 12) and _now.day >= 15  # 季底投信作帳期(投信拉抬持股美化淨值)
     hist = update_history(load_history(), trading_date, quotes)
 
     cand = []
@@ -270,6 +275,7 @@ def main() -> int:
     meta = {
         "updated_at": datetime.now(TPE).isoformat(timespec="seconds"),
         "trading_date": trading_date,
+        "quarter_end": quarter_end,
         "universe": len(cand), "shown": len(top),
         "market_split": {
             "twse": sum(1 for r in top if r["mkt"] == "twse"),

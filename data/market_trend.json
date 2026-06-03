@@ -1,5 +1,127 @@
 {
- "updated": "2026-06-03T18:00:57+08:00",
- "margin": [],
- "inst": []
+ "updated": "2026-06-03T18:51:43+08:00",
+ "margin": [
+  {
+   "date": "20260520",
+   "margin_lots": 9057024.0,
+   "short_lots": 244522.0,
+   "margin_yi": 5020.8
+  },
+  {
+   "date": "20260521",
+   "margin_lots": 9125858.0,
+   "short_lots": 262407.0,
+   "margin_yi": 5111.5
+  },
+  {
+   "date": "20260522",
+   "margin_lots": 9236393.0,
+   "short_lots": 257442.0,
+   "margin_yi": 5222.9
+  },
+  {
+   "date": "20260525",
+   "margin_lots": 9273748.0,
+   "short_lots": 232580.0,
+   "margin_yi": 5304.8
+  },
+  {
+   "date": "20260526",
+   "margin_lots": 9174570.0,
+   "short_lots": 228387.0,
+   "margin_yi": 5345.9
+  },
+  {
+   "date": "20260527",
+   "margin_lots": 9155800.0,
+   "short_lots": 241621.0,
+   "margin_yi": 5362.7
+  },
+  {
+   "date": "20260528",
+   "margin_lots": 9113201.0,
+   "short_lots": 248097.0,
+   "margin_yi": 5350.3
+  },
+  {
+   "date": "20260529",
+   "margin_lots": 9309242.0,
+   "short_lots": 241804.0,
+   "margin_yi": 5563.6
+  },
+  {
+   "date": "20260601",
+   "margin_lots": 9391953.0,
+   "short_lots": 234867.0,
+   "margin_yi": 5657.8
+  },
+  {
+   "date": "20260602",
+   "margin_lots": 9373187.0,
+   "short_lots": 260047.0,
+   "margin_yi": 5669.7
+  }
+ ],
+ "inst": [
+  {
+   "date": "20260521",
+   "foreign_yi": 603.4,
+   "trust_yi": 53.8,
+   "dealer_yi": 196.0
+  },
+  {
+   "date": "20260522",
+   "foreign_yi": 761.4,
+   "trust_yi": 112.3,
+   "dealer_yi": 194.8
+  },
+  {
+   "date": "20260525",
+   "foreign_yi": 494.6,
+   "trust_yi": 84.1,
+   "dealer_yi": 68.9
+  },
+  {
+   "date": "20260526",
+   "foreign_yi": 354.4,
+   "trust_yi": 53.8,
+   "dealer_yi": 49.1
+  },
+  {
+   "date": "20260527",
+   "foreign_yi": 381.3,
+   "trust_yi": -42.2,
+   "dealer_yi": -31.3
+  },
+  {
+   "date": "20260528",
+   "foreign_yi": -381.4,
+   "trust_yi": -62.1,
+   "dealer_yi": -150.4
+  },
+  {
+   "date": "20260529",
+   "foreign_yi": 801.5,
+   "trust_yi": 70.2,
+   "dealer_yi": 156.1
+  },
+  {
+   "date": "20260601",
+   "foreign_yi": 368.2,
+   "trust_yi": 77.6,
+   "dealer_yi": -65.1
+  },
+  {
+   "date": "20260602",
+   "foreign_yi": 108.4,
+   "trust_yi": 28.2,
+   "dealer_yi": -157.7
+  },
+  {
+   "date": "20260603",
+   "foreign_yi": 434.0,
+   "trust_yi": 55.7,
+   "dealer_yi": 26.0
+  }
+ ]
 }
