@@ -55,6 +55,8 @@ async function boot() {
   renderTabs();
   render();
   setupModal();
+  const deep = location.hash.slice(1);  // 深層連結:#代號 直接開個股詳情(分享/書籤/重整)
+  if (deep && STOCKS.find((x) => x.c === deep)) openDetail(deep);
 }
 
 function renderMeta() {
@@ -347,6 +349,7 @@ function openDetail(code) {
   document.getElementById("m-close").addEventListener("click", closeModal);
   document.querySelectorAll("[data-peer]").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.peer)));
+  if (location.hash !== "#" + code) history.replaceState(null, "", "#" + code);  // 可分享/重整保留
 }
 
 function setupModal() {
@@ -354,7 +357,10 @@ function setupModal() {
   m.addEventListener("click", (e) => { if (e.target === m) closeModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 }
-function closeModal() { document.getElementById("modal").classList.remove("show"); }
+function closeModal() {
+  document.getElementById("modal").classList.remove("show");
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+}
 
 function renderTopic(box) {
   const heat = META.topic_heat || {};

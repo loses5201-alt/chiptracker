@@ -96,6 +96,27 @@ def _tpex_insti_day(ds: str, want: set) -> dict:
     return out
 
 
+def _tpex_margin_day(ds: str, want: set) -> dict:
+    """單日上櫃個股融資餘額(張);ds YYYYMMDD→櫃買 YYYY/MM/DD。欄位 row[6]=資餘額。"""
+    if not want:
+        return {}
+    d = f"{ds[:4]}/{ds[4:6]}/{ds[6:]}"
+    j = _get(f"https://www.tpex.org.tw/www/zh-tw/margin/balance?date={d}&response=json")
+    if not j or j.get("stat") != "ok":
+        return {}
+    tbl = max(j.get("tables") or [], key=lambda t: len(t.get("data") or []), default=None)
+    if not tbl or not tbl.get("data"):
+        return {}
+    out = {}
+    for row in tbl["data"]:
+        if len(row) <= 6:
+            continue
+        code = str(row[0]).strip()
+        if code in want:
+            out[code] = _num(row[6])
+    return out
+
+
 def _buy_streak(vals: list) -> int:
     """法人連續同向天數:正=連買、負=連賣、0=混。"""
     if not vals:
@@ -144,14 +165,22 @@ def fetch(items: list, days: int = 10, lookback: int = 24) -> dict:
         if len(rows) >= days:
             break
         ds = (today - timedelta(days=back)).strftime("%Y%m%d")
-        inst = _t86_day(ds, twse_want) if twse_want else {}
-        if twse_want and inst is None:    # 非交易日
+        inst = _t86_day(ds, twse_want) if twse_want else None
+        tp_inst = _tpex_insti_day(ds, tpex_want) if tpex_want else {}
+        # 交易日判斷:有上市股看 T86(None=非交易日);全上櫃則看 TPEX 是否有資料
+        if twse_want:
+            if inst is None:
+                time.sleep(0.2)
+                continue
+        elif not tp_inst:
             time.sleep(0.2)
             continue
         inst = inst or {}
+        inst.update(tp_inst)
+        mg = _margin_day(ds, twse_want) if twse_want else {}
         if tpex_want:
-            inst.update(_tpex_insti_day(ds, tpex_want))
-        rows.append((ds, inst, _margin_day(ds, twse_want) if twse_want else {}))
+            mg.update(_tpex_margin_day(ds, tpex_want))
+        rows.append((ds, inst, mg))
     rows.reverse()
     dates = [r[0] for r in rows]
     out = {}
