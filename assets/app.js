@@ -26,6 +26,7 @@ let PERF = null;
 let WREVIEW = null;
 let MTREND = null;
 let CHIPS = null;
+let HPERF = null;
 let view = "entry";
 
 async function boot() {
@@ -41,6 +42,7 @@ async function boot() {
     WREVIEW = await fetch("data/weight_review.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     MTREND = await fetch("data/market_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     CHIPS = await fetch("data/stock_chips.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    HPERF = await fetch("data/historical_performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -369,12 +371,51 @@ function weightReviewBlock() {
     <div class="note">${w.note || ""}</div>`;
 }
 
+// 歷史回測區(離線跑的真實歷史驗證,即時可看,不必等每日快照累積)
+function historicalBlock() {
+  const h = HPERF;
+  if (!h || h.status !== "ok") return "";
+  const W = h.windows;
+  const qLabel = { q1: "最低分 q1", q2: "q2", q3: "q3", q4: "q4", q5: "最高分 q5" };
+  const qRows = ["q1", "q2", "q3", "q4", "q5"].map((q) =>
+    `<tr><td class="bt-grp">${qLabel[q]}</td>${W.map((w) => {
+      const d = h.quintile[q][String(w)];
+      if (!d || d.avg == null) return `<td class="bt-na">—</td>`;
+      const cls = d.avg >= 0 ? "up" : "down";
+      const a = d.alpha != null ? `α${d.alpha >= 0 ? "+" : ""}${d.alpha} ` : "";
+      return `<td><span class="bt-ret ${cls}">${d.avg >= 0 ? "+" : ""}${d.avg}%</span><span class="bt-sub">${a}勝${d.win_rate}%</span></td>`;
+    }).join("")}</tr>`).join("");
+  const mono = W.map((w) => {
+    const v = h.monotonic[String(w)];
+    const t = v === true ? "✓ 有預測力" : v === false ? "✗ 不單調" : "資料不足";
+    const c = v === true ? "ok" : v === false ? "bad" : "na";
+    return `<div class="mono-box ${c}"><div class="mono-w">${w}日</div><div class="mono-t">${t}</div></div>`;
+  }).join("");
+  const topAlpha = W.map((w) => `${w}日 ${h.top[String(w)] && h.top[String(w)].alpha != null ? (h.top[String(w)].alpha >= 0 ? "+" : "") + h.top[String(w)].alpha : "—"}`).join(" · ");
+  const allFalse = W.every((w) => h.monotonic[String(w)] === false);
+  const conclusion = allFalse
+    ? `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 本期發現:</b>五分位無單調性 — 籌碼+技術評分在此區間(多頭)對大型股的區分力不足,真正的 alpha 可能來自尚未納入回測的題材/基本面。回測的價值是看見真相、避免自我感覺良好。</div>`
+    : "";
+  const st = h.strategy || { top20: [], bench20: [] };
+  const avg = (a) => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "—";
+  return `<div class="m-section">📈 歷史回測(${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")})</div>
+    <div class="note" style="margin-top:0">標的池:成交值前 ${h.universe} 大上市股;歷史評分 = ${h.factors_used}</div>
+    <div class="m-section" style="font-size:12.5px">評分五分位後續報酬(最高分 q5 應高於最低分 q1 = 評分有效)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr><th>分位</th>${W.map((w) => `<th>${w} 日</th>`).join("")}</tr></thead><tbody>${qRows}</tbody></table></div>
+    <div class="m-section" style="font-size:12.5px">評分預測力(q5 ≥ q4 ≥ q3 ≥ q2 ≥ q1?)</div>
+    <div class="mono-grid">${mono}</div>
+    ${conclusion}
+    <div class="note">top${h.top_n} 超額報酬(vs 大盤):${topAlpha}。<br>
+      策略(每交易日買 top${h.top_n}、持有20日)平均報酬 <b>${avg(st.top20)}%</b> vs 同期大盤 <b>${avg(st.bench20)}%</b>。${h.note}</div>`;
+}
+
 // 回測分頁:驗證「分數越高、後續越會漲嗎?」
 function renderBacktest(box) {
   const wr = weightReviewBlock();
+  const hb = historicalBlock();
   if (!PERF || PERF.status !== "ok") {
     const msg = PERF && PERF.msg ? PERF.msg : "回測資料尚未產生。";
-    box.innerHTML = wr + `<div class="bt-intro">
+    box.innerHTML = wr + hb + `<div class="bt-intro">
       <h3>📊 推薦成效回測</h3>
       <p>這裡會驗證一件最重要的事:<b>分數越高的股票,之後真的越會漲嗎?</b></p>
       <p class="bt-wait">${msg}</p>
@@ -436,7 +477,7 @@ function renderBacktest(box) {
       return `<td><span class="bt-ret ${cls}">${v >= 0 ? "+" : ""}${v}</span></td>`;
     }).join("")}</tr>`).join("");
 
-  box.innerHTML = wr + `
+  box.innerHTML = wr + hb + `
     <div class="bt-head">
       <div><h3>📊 推薦成效回測</h3>
         <p class="bt-meta">累積 ${PERF.snapshot_days} 個交易日 · 評估 ${PERF.recommendations_seen} 筆推薦 ·
