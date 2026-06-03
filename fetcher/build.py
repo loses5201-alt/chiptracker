@@ -301,6 +301,17 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
         chips = {}
         print(f"  個股籌碼失敗(略過):{e}")
+    # 補算法人成本線:近期法人買超的加權均價(只計買超日)→ 供「股價 vs 法人成本」判讀
+    for code, ch in chips.items():
+        p = yh.get(code)
+        if not p:
+            continue
+        num = den = 0.0
+        for d, iv in zip(ch["dates"], ch["inst"]):
+            if iv > 0 and d in p["dates"]:
+                num += iv * p["closes"][p["dates"].index(d)]
+                den += iv
+        ch["cost"] = round(num / den, 2) if den else None
     (DATA / "stock_chips.json").write_text(json.dumps(chips, ensure_ascii=False), encoding="utf-8")
     print(f"  個股籌碼 {len(chips)} 檔")
 

@@ -289,13 +289,24 @@ function openDetail(code) {
     : "";
   const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
   const hasMargin = ch && ch.margin && ch.margin.some((v) => v > 0);
+  const turnTag = ch && ch.turn ? `<span class="streak-badge ${ch.turn === "初買" ? "up" : "down"}">${ch.turn}</span>` : "";
+  let costRow = "";
+  if (ch && ch.cost && s.close) {
+    const diff = (s.close - ch.cost) / ch.cost * 100;
+    const below = diff < 0;
+    const note = below ? `跌破法人成本 ${diff.toFixed(1)}%` : `高於成本 +${diff.toFixed(1)}%`;
+    costRow = `<div class="ct-row"><span class="ct-k">法人成本</span>
+      <b style="font-family:'JetBrains Mono',monospace;font-size:14px">${ch.cost}</b>
+      <span class="ct-note" style="${below ? "color:#f59e0b;font-weight:600" : ""}">${note}</span></div>`;
+  }
   const chipBlock = ch && ch.inst && ch.inst.length >= 2
     ? `<div class="m-section">籌碼趨勢(近 ${ch.inst.length} 交易日,法人單位:股)</div>
        <div class="chip-trend">
-         <div class="ct-row"><span class="ct-k">三大法人</span>${miniSpark(ch.inst, 150, 30)}${streakBadge(ch.inst_buy_streak)}</div>
+         <div class="ct-row"><span class="ct-k">三大法人</span>${miniSpark(ch.inst, 150, 30)}${streakBadge(ch.inst_buy_streak)}${turnTag}</div>
          ${hasMargin
         ? `<div class="ct-row"><span class="ct-k">融資餘額</span>${miniSpark(ch.margin, 150, 30)}<span class="ct-note">${marginNote(ch.margin)}</span></div>`
         : `<div class="ct-row"><span class="ct-k">融資餘額</span><span class="ct-note">上櫃融資歷史暫不支援</span></div>`}
+         ${costRow}
        </div>`
     : "";
   const peers = (ALL_STOCKS || []).filter((x) => x.topic === s.topic && s.topic !== "—")

@@ -134,6 +134,19 @@ def _buy_streak(vals: list) -> int:
     return n * d
 
 
+def _turn_signal(vals: list) -> str | None:
+    """法人轉折:近2日由賣轉買=「初買」(比連買更早的進場訊號);由買轉賣=「初賣」(早空訊號)。"""
+    if len(vals) < 5:
+        return None
+    recent = sum(vals[-2:])
+    prior = sum(vals[-7:-2]) if len(vals) >= 7 else sum(vals[:-2])
+    if recent > 0 and prior < 0:
+        return "初買"
+    if recent < 0 and prior > 0:
+        return "初賣"
+    return None
+
+
 def _ffill(vals: list) -> list:
     """融資餘額缺值(0,某日 MI_MARGN 抓取失敗)用前一日填;開頭缺用第一個有效值回填。
     (融資餘額不會真的是 0,0 一律視為缺資料,避免污染走勢與變化率)"""
@@ -191,5 +204,6 @@ def fetch(items: list, days: int = 10, lookback: int = 24) -> dict:
             "inst": inst_series,                                   # 三大法人合計(股)
             "margin": _ffill([r[2].get(code, 0) for r in rows]),   # 融資餘額(張,缺值前填)
             "inst_buy_streak": _buy_streak(inst_series),
+            "turn": _turn_signal(inst_series),
         }
     return out
