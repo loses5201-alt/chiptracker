@@ -250,9 +250,9 @@ def main() -> int:
     print(f"  大盤趨勢:融資 {len(mtrend)} 日 / 法人 {len(itrend)} 日")
 
     # 個股籌碼歷史(top 上市股近10交易日法人/融資趨勢,延續「看一段時間」到個股)
-    twse_top = [r["c"] for r in top if r["mkt"] == "twse"]
+    top_pairs = [(r["c"], r["mkt"]) for r in top]
     try:
-        chips = fetch_stock_chips(twse_top, 10)
+        chips = fetch_stock_chips(top_pairs, 10)
     except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
         chips = {}
         print(f"  個股籌碼失敗(略過):{e}")

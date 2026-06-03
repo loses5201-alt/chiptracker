@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-06-03T08:38:24+08:00",
+ "updated_at": "2026-06-03T08:51:49+08:00",
  "trading_date": "20260602",
  "universe": 80,
  "shown": 40,
@@ -25,7 +25,7 @@
  },
  "topic_heat": {
   "記憶體": 8,
-  "AI伺服器": 20,
+  "AI伺服器": 19,
   "CoWoS先進封裝": 2,
   "矽光子CPO": 2,
   "散熱": 4,
@@ -44,16 +44,16 @@
   "decliners": 1059,
   "unchanged": 172,
   "breadth_pct": 48.5,
-  "inst_foreign": 368.2,
-  "inst_trust": 77.6,
-  "inst_dealer": -65.1,
-  "inst_total": 380.7,
+  "inst_foreign": 108.4,
+  "inst_trust": 28.2,
+  "inst_dealer": -157.7,
+  "inst_total": -21.1,
   "margin_chg_lots": -40594.0,
   "margin_up_count": 834,
   "hot_topics": [
    {
     "name": "AI伺服器",
-    "heat": 20,
+    "heat": 19,
     "mom": 21.3
    },
    {

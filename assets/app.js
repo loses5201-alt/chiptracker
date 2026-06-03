@@ -281,13 +281,29 @@ function openDetail(code) {
        <div class="news-list">${s.news.map((t) => `<div class="news-item">${t}</div>`).join("")}</div>`
     : "";
   const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
+  const hasMargin = ch && ch.margin && ch.margin.some((v) => v > 0);
   const chipBlock = ch && ch.inst && ch.inst.length >= 2
     ? `<div class="m-section">籌碼趨勢(近 ${ch.inst.length} 交易日,法人單位:股)</div>
        <div class="chip-trend">
          <div class="ct-row"><span class="ct-k">三大法人</span>${miniSpark(ch.inst, 150, 30)}${streakBadge(ch.inst_buy_streak)}</div>
-         <div class="ct-row"><span class="ct-k">融資餘額</span>${miniSpark(ch.margin, 150, 30)}<span class="ct-note">${marginNote(ch.margin)}</span></div>
+         ${hasMargin
+        ? `<div class="ct-row"><span class="ct-k">融資餘額</span>${miniSpark(ch.margin, 150, 30)}<span class="ct-note">${marginNote(ch.margin)}</span></div>`
+        : `<div class="ct-row"><span class="ct-k">融資餘額</span><span class="ct-note">上櫃融資歷史暫不支援</span></div>`}
        </div>`
-    : (s.mkt === "tpex" ? `<div class="m-section">籌碼趨勢</div><div class="note">上櫃個股籌碼歷史暫不支援</div>` : "");
+    : "";
+  const peers = (ALL_STOCKS || []).filter((x) => x.topic === s.topic && s.topic !== "—")
+    .sort((a, b) => b.base - a.base).slice(0, 8);
+  const peerBlock = (s.topic !== "—" && peers.length > 1)
+    ? `<div class="m-section">${s.topic} 同題材比較(base 基礎分)</div>
+       <div class="peer-list">${peers.map((p) => {
+        const me = p.c === s.c;
+        const inTop = STOCKS.find((x) => x.c === p.c);
+        return `<div class="peer-row${me ? " me" : ""}"${inTop && !me ? ` data-peer="${p.c}"` : ""}>
+          <span class="peer-name">${p.n}<span class="stock-code">${p.c}</span>${me ? " ◀ 本檔" : ""}</span>
+          <span class="peer-bar"><span style="width:${Math.min(100, p.base)}%"></span></span>
+          <span class="peer-score">${p.base}</span></div>`;
+      }).join("")}</div>`
+    : "";
   document.getElementById("modal-body").innerHTML = `
     <div class="m-head">
       <div>
@@ -310,6 +326,7 @@ function openDetail(code) {
     <div class="m-section">近 ${s.closes ? s.closes.length : 0} 日走勢</div>
     ${sparkline(s.closes)}
     ${chipBlock}
+    ${peerBlock}
     ${newsBlock}
     <div class="m-section">籌碼與基本面</div>
     <div class="dl"><span class="k">三大法人</span><span class="v">${s.smart}</span></div>
@@ -328,6 +345,8 @@ function openDetail(code) {
   `;
   document.getElementById("modal").classList.add("show");
   document.getElementById("m-close").addEventListener("click", closeModal);
+  document.querySelectorAll("[data-peer]").forEach((el) =>
+    el.addEventListener("click", () => openDetail(el.dataset.peer)));
 }
 
 function setupModal() {

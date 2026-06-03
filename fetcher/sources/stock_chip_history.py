@@ -73,6 +73,29 @@ def _margin_day(ds: str, want: set) -> dict:
     return out
 
 
+def _tpex_insti_day(ds: str, want: set) -> dict:
+    """單日上櫃個股三大法人合計(股);ds 為 YYYYMMDD(內部轉櫃買的 YYYY/MM/DD)。失敗回空。
+    來源:tpex.org.tw/www/zh-tw/insti/dailyTrade(可指定日期),欄位 row[23]=三大法人合計。"""
+    if not want:
+        return {}
+    d = f"{ds[:4]}/{ds[4:6]}/{ds[6:]}"
+    j = _get(f"https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date={d}&id=&response=json")
+    if not j or j.get("stat") != "ok":
+        return {}
+    tables = j.get("tables") or []
+    tbl = max(tables, key=lambda t: len(t.get("data") or []), default=None)
+    if not tbl or not tbl.get("data"):
+        return {}
+    out = {}
+    for row in tbl["data"]:
+        if len(row) <= 23:
+            continue
+        code = str(row[0]).strip()
+        if code in want:
+            out[code] = _num(row[23])
+    return out
+
+
 def _buy_streak(vals: list) -> int:
     """法人連續同向天數:正=連買、負=連賣、0=混。"""
     if not vals:
@@ -102,22 +125,33 @@ def _ffill(vals: list) -> list:
     return [x if x else first for x in out]
 
 
-def fetch(codes: list[str], days: int = 10, lookback: int = 24) -> dict:
-    """回 top 上市股近 days 交易日籌碼歷史(舊→新)。"""
-    if not codes:
+def fetch(items: list, days: int = 10, lookback: int = 24) -> dict:
+    """
+    回 top 推薦股近 days 交易日籌碼歷史(舊→新)。
+    items:[(code, mkt)] 或 [code](預設上市)。上市法人走 T86、融資走 MI_MARGN;
+    上櫃法人走 TPEX dailyTrade、融資暫無(上櫃無免費融資歷史源)。
+    交易日以上市 T86 為準對齊(top 通常含上市股)。
+    """
+    if not items:
         return {}
-    want = set(codes)
+    pairs = [(x[0], x[1]) if isinstance(x, (tuple, list)) else (x, "twse") for x in items]
+    codes = [c for c, _ in pairs]
+    twse_want = {c for c, m in pairs if m == "twse"}
+    tpex_want = {c for c, m in pairs if m == "tpex"}
     today = datetime.now(TPE).date()
     rows: list[tuple] = []  # (date, inst_map, margin_map)
     for back in range(lookback):
         if len(rows) >= days:
             break
         ds = (today - timedelta(days=back)).strftime("%Y%m%d")
-        inst = _t86_day(ds, want)
-        if inst is None:          # 非交易日
+        inst = _t86_day(ds, twse_want) if twse_want else {}
+        if twse_want and inst is None:    # 非交易日
             time.sleep(0.2)
             continue
-        rows.append((ds, inst, _margin_day(ds, want)))
+        inst = inst or {}
+        if tpex_want:
+            inst.update(_tpex_insti_day(ds, tpex_want))
+        rows.append((ds, inst, _margin_day(ds, twse_want) if twse_want else {}))
     rows.reverse()
     dates = [r[0] for r in rows]
     out = {}
