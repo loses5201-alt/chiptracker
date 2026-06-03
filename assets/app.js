@@ -423,7 +423,7 @@ function historicalBlock() {
   const topAlpha = W.map((w) => `${w}日 ${h.top[String(w)] && h.top[String(w)].alpha != null ? (h.top[String(w)].alpha >= 0 ? "+" : "") + h.top[String(w)].alpha : "—"}`).join(" · ");
   const allFalse = W.every((w) => h.monotonic[String(w)] === false);
   const conclusion = allFalse
-    ? `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 本期發現:</b>五分位無單調性 — 籌碼+技術評分在此區間(多頭)對大型股的區分力不足,真正的 alpha 可能來自尚未納入回測的題材/基本面。回測的價值是看見真相、避免自我感覺良好。</div>`
+    ? `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 本期發現:</b>五分位仍無單調性(整體區分強弱能力不足),但 top${h.top_n} 超額報酬為正 — 評分對「篩出最強少數」有效、對「全面區分」仍不足;加入國際面後 top 超額提升,顯示題材/國際確有貢獻,完整預測力可能還需題材新聞面(無歷史可回測)。回測重點是看見真相、不自我感覺良好。</div>`
     : "";
   const st = h.strategy || { top20: [], bench20: [] };
   const avg = (a) => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "—";

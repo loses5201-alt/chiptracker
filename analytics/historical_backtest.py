@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fetcher import scoring
+from fetcher import scoring, sectors
 from fetcher.sources.price_history import PriceHistorySource, fetch_symbol
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -136,12 +136,37 @@ def _backfill_chips(universe: list[str]) -> tuple[dict, dict, list[str]]:
     return inst_by_date, mg_by_date, days
 
 
-def _simplified_score(inst: dict, mg: dict, closes: list[float], vol: float, avg_vol: float | None) -> int:
-    """歷史可回填的三面向:s1 法人 + s2 融資 + s6 技術(滿分 45)。"""
+def _backfill_overseas() -> dict:
+    """抓題材表所有海外標的歷史(Yahoo),供回測算各交易日的題材海外動能。"""
+    out = {}
+    for sym in sectors.all_overseas_symbols():
+        d = fetch_symbol(sym, "6mo")
+        if d:
+            out[sym] = d
+    return out
+
+
+def _topic_mom_at(ds: str, ov_hist: dict) -> dict:
+    """台股交易日 ds 的各題材海外動能(海外標的近5日漲幅平均%)。
+    海外標的以 <= ds 的最近交易日對齊(美股/台股日期不完全一致)。"""
+    sym_mom = {}
+    for sym, d in ov_hist.items():
+        dates, closes = d["dates"], d["closes"]
+        idx = next((i for i in range(len(dates) - 1, -1, -1) if dates[i] <= ds), None)
+        if idx is None or idx < 5 or closes[idx - 5] <= 0:
+            continue
+        sym_mom[sym] = round((closes[idx] - closes[idx - 5]) / closes[idx - 5] * 100, 2)
+    return sectors.topic_overseas_momentum(sym_mom)
+
+
+def _simplified_score(inst, mg, closes, vol, avg_vol, topic=None, topic_mom=0.0) -> int:
+    """歷史可回填的四面向:s1 法人 + s2 融資 + s4 國際 + s6 技術(滿分 65)。
+    s4 用該股題材的海外同業近5日動能(海外歷史可回填);無題材時 score_overseas 給中性。"""
     s1, _ = scoring.score_institutional(inst, vol)
     s2, _ = scoring.score_margin_short(mg, inst)
+    s4, _ = scoring.score_overseas(topic, topic_mom)
     s6, _, _, _ = scoring.score_momentum(closes, vol, avg_vol)
-    return s1 + s2 + s6
+    return s1 + s2 + s4 + s6
 
 
 def _forward(closes: list[float], i: int, w: int) -> float | None:
@@ -161,7 +186,8 @@ def run() -> dict:
     print(f"  籌碼回填 {len(days)} 交易日;抓 Yahoo 價量…")
     px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12)
     index = fetch_symbol(BENCHMARK, "1y")
-    print(f"  價量 {len(px)}/{len(universe)} 檔;大盤 {'OK' if index else '失敗'};開始回測…")
+    ov_hist = _backfill_overseas()
+    print(f"  價量 {len(px)}/{len(universe)} 檔;大盤 {'OK' if index else '失敗'};海外 {len(ov_hist)} 檔;開始回測…")
 
     # 可回測日:留前 WARMUP 暖身、後 max(FORWARD) 觀察
     test_days = days[WARMUP: len(days) - max(FORWARD)] if len(days) > WARMUP + max(FORWARD) else []
@@ -174,6 +200,7 @@ def run() -> dict:
     idx_closes = index["closes"] if index else []
 
     for ds in test_days:
+        tmom = _topic_mom_at(ds, ov_hist)
         scored = []  # (score, code, i_in_px)
         for code in universe:
             p = px.get(code)
@@ -187,7 +214,8 @@ def run() -> dict:
             avg_vol = sum(p["vols"][i - 5:i]) / 5 if i >= 5 else None
             inst = inst_d.get(ds, {}).get(code, {})
             mg = mg_d.get(ds, {}).get(code, {})
-            sc = _simplified_score(inst, mg, closes, vol, avg_vol)
+            topic, tm = sectors.best_topic_for(code, tmom)
+            sc = _simplified_score(inst, mg, closes, vol, avg_vol, topic, tm)
             scored.append((sc, code, i))
         if len(scored) < 10:
             continue
@@ -231,7 +259,7 @@ def run() -> dict:
         "test_days": len(test_days),
         "date_range": [days[0], days[-1]] if days else [],
         "windows": FORWARD, "top_n": TOP_N, "benchmark": BENCHMARK,
-        "factors_used": "s1法人 + s2融資 + s6技術(可回填三面向,滿分45)",
+        "factors_used": "s1法人 + s2融資 + s4國際 + s6技術(可回填四面向,滿分65)",
         "quintile": {f"q{q+1}": {str(w): _stat(quint[q][w], quint_a[q][w]) for w in FORWARD} for q in range(5)},
         "top": {str(w): _stat(top_ret[w], top_alpha[w]) for w in FORWARD},
         "monotonic": _monotonic(quint_a),
