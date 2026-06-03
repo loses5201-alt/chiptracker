@@ -29,7 +29,7 @@ from .sources.stock_chip_history import fetch as fetch_stock_chips
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 TOP_N = 40
-CANDIDATES = 80
+CANDIDATES = 120
 HISTORY_CAP = 60
 CHART_DAYS = 30
 TPE = timezone(timedelta(hours=8))

@@ -82,14 +82,14 @@ def fetch_symbol(symbol: str, rng: str = "6mo") -> dict | None:
 class PriceHistorySource:
     name = "yahoo_history"
 
-    def fetch(self, items: list, workers: int = 10) -> dict[str, dict]:
+    def fetch(self, items: list, workers: int = 10, rng: str = "3mo") -> dict[str, dict]:
         """
         並行抓多檔,回 {code: {dates, closes, vols}}(抓不到的略過)。
-        items 可為 list[str] 或 list[(code, market)]。
+        items 可為 list[str] 或 list[(code, market)];rng 指定歷史長度(回測用 1y)。
         """
         out: dict[str, dict] = {}
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            for code, data in ex.map(_fetch_one, items):
+            for code, data in ex.map(lambda a: _fetch_one(a, rng), items):
                 if data:
                     out[code] = data
         return out

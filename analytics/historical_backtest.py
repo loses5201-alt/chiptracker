@@ -33,8 +33,8 @@ RWD = "https://www.twse.com.tw/rwd/zh"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json",
            "Referer": "https://www.twse.com.tw/"}
 
-UNIVERSE_N = 120        # 回測標的池:成交值前 N 大上市股
-LOOKBACK = 60           # 回填近 N 交易日
+UNIVERSE_N = 200        # 回測標的池:成交值前 N 大上市股
+LOOKBACK = 120          # 回填近 N 交易日(約半年,涵蓋更多市況)
 WARMUP = 20             # 前段暖身(算均線/RSI 需要)
 FORWARD = [5, 10, 20]   # 後續報酬窗口(交易日)
 TOP_N = 10              # 每日選前幾名當「策略持股」
@@ -184,7 +184,7 @@ def run() -> dict:
     print(f"  universe {len(universe)} 檔;回填近 {LOOKBACK} 交易日籌碼…")
     inst_d, mg_d, days = _backfill_chips(universe)
     print(f"  籌碼回填 {len(days)} 交易日;抓 Yahoo 價量…")
-    px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12)
+    px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12, rng="1y")
     index = fetch_symbol(BENCHMARK, "1y")
     ov_hist = _backfill_overseas()
     print(f"  價量 {len(px)}/{len(universe)} 檔;大盤 {'OK' if index else '失敗'};海外 {len(ov_hist)} 檔;開始回測…")
