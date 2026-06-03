@@ -18,6 +18,7 @@ const TABS = [
   { k: "intl", t: "國際連動" },
   { k: "backtest", t: "回測" },
   { k: "overview", t: "總覽" },
+  { k: "watch", t: "查詢/自選" },
 ];
 
 let STOCKS = [];
@@ -27,6 +28,7 @@ let WREVIEW = null;
 let MTREND = null;
 let CHIPS = null;
 let HPERF = null;
+let ALL_STOCKS = null;
 let view = "entry";
 
 async function boot() {
@@ -43,6 +45,7 @@ async function boot() {
     MTREND = await fetch("data/market_trend.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     CHIPS = await fetch("data/stock_chips.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     HPERF = await fetch("data/historical_performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    ALL_STOCKS = await fetch("data/all_stocks.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -83,6 +86,7 @@ function render() {
   if (view === "overview") return renderOverview(box);
   if (view === "topic") return renderTopic(box);
   if (view === "backtest") return renderBacktest(box);
+  if (view === "watch") return renderWatchlist(box);
   let list = [...STOCKS];
   if (view === "foreign") list.sort((a, b) => b.s1 - a.s1);
   if (view === "fund") list = list.filter((s) => s.yoy != null).sort((a, b) => b.s3 - a.s3);
@@ -652,6 +656,55 @@ function renderSkeleton() {
   const sk = `<div class="sk-card"><div class="sk-line w60"></div><div class="sk-line w40"></div>
     <div class="sk-radar"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>`;
   document.getElementById("content").innerHTML = `<div class="grid">${sk.repeat(6)}</div>`;
+}
+
+// ── 全市場查詢 + 自選股(localStorage)──
+function getWatch() { try { return JSON.parse(localStorage.getItem("ct-watch") || "[]"); } catch { return []; } }
+function toggleWatch(c) { const w = getWatch(); localStorage.setItem("ct-watch", JSON.stringify(w.includes(c) ? w.filter((x) => x !== c) : [...w, c])); }
+function findStock(code) { return (ALL_STOCKS || []).find((s) => s.c === code); }
+
+function stockRow(s) {
+  if (!s) return "";
+  const watched = getWatch().includes(s.c);
+  const inTop = STOCKS.find((x) => x.c === s.c);
+  return `<div class="srow"${inTop ? ` data-detail="${s.c}"` : ""}>
+    <button class="sr-star ${watched ? "on" : ""}" data-star="${s.c}">${watched ? "★" : "☆"}</button>
+    <span class="sr-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</span>
+    <span class="sr-topic">${s.topic && s.topic !== "—" ? s.topic : ""}</span>
+    <span class="sr-score">${s.base}<small>分</small></span>
+    ${inTop ? '<span class="sr-in">推薦中</span>' : ""}</div>`;
+}
+
+function renderWatchlist(box) {
+  const total = ALL_STOCKS ? ALL_STOCKS.length : 0;
+  const wl = getWatch();
+  const watchRows = wl.length
+    ? wl.map((c) => stockRow(findStock(c))).join("")
+    : '<div class="empty" style="padding:24px">尚無自選股 — 搜尋後點 ☆ 加入追蹤</div>';
+  box.innerHTML = `
+    <div class="search-bar"><input id="stock-search" type="search" autocomplete="off" placeholder="🔍 輸入代號或名稱,查全市場 ${total} 檔評分"></div>
+    <div class="m-section">⭐ 自選股 (${wl.length})</div>
+    <div id="watch-list" class="srows">${watchRows}</div>
+    <div class="m-section">搜尋結果</div>
+    <div id="search-result" class="srows"><div class="muted" style="padding:14px">在上方輸入關鍵字…</div></div>
+  ` + footNote();
+
+  const input = document.getElementById("stock-search");
+  const result = document.getElementById("search-result");
+  const bindRows = () => {
+    box.querySelectorAll(".sr-star").forEach((el) => el.addEventListener("click", (e) => {
+      e.stopPropagation(); toggleWatch(el.dataset.star); renderWatchlist(box);
+    }));
+    box.querySelectorAll("[data-detail]").forEach((el) => el.addEventListener("click", () => openDetail(el.dataset.detail)));
+  };
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { result.innerHTML = '<div class="muted" style="padding:14px">在上方輸入關鍵字…</div>'; return; }
+    const hits = (ALL_STOCKS || []).filter((s) => s.c.includes(q) || s.n.toLowerCase().includes(q)).slice(0, 30);
+    result.innerHTML = hits.length ? hits.map(stockRow).join("") : '<div class="empty" style="padding:20px">查無此股(僅含當日有量的個股)</div>';
+    bindRows();
+  });
+  bindRows();
 }
 
 function footNote() {

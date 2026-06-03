@@ -161,8 +161,17 @@ def main() -> int:
         bs = base_scores(q, inst.get(code, {}), margin.get(code, {}), funds.get(code), topic, tmom, h)
         cand.append((code, q, topic, tmom, bs))
     cand.sort(key=lambda x: x[4]["base"], reverse=True)
+    # 全市場基礎評分(供前端查詢/自選任一檔;s6 技術僅候選股回補,故全市場用 s1~s5 base)
+    all_scored = [
+        {"c": code, "n": q.get("name", ""), "mkt": "tpex" if code in tpex_codes else "twse",
+         "close": q.get("close", 0), "base": bs["base"], "topic": topic or "—",
+         "s1": bs["s1"], "s2": bs["s2"], "s3": bs["s3"], "s4": bs["s4"], "s5": bs["s5"]}
+        for code, q, topic, tmom, bs in cand
+    ]
+    (DATA / "all_stocks.json").write_text(
+        json.dumps(all_scored, ensure_ascii=False), encoding="utf-8")
     cand = cand[:CANDIDATES]
-    print(f"  候選 {len(cand)} 檔")
+    print(f"  全市場評分 {len(all_scored)} 檔 / 候選 {len(cand)} 檔")
 
     print("階段2:回補候選股 Yahoo 歷史 → 算技術面…")
     yh = hist_src.fetch([(c[0], "tpex" if c[0] in tpex_codes else "twse") for c in cand])
