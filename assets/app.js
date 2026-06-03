@@ -13,8 +13,8 @@ const REC_TEXT = { strong: "強力建議", mid: "可留意", watch: "觀察" };
 const SHORT_TEXT = { strong: "強烈做空", mid: "留意做空", watch: "觀察" };
 const STEALTH_TEXT = { strong: "強力潛伏", mid: "潛伏中", watch: "觀察" };
 const TABS = [
-  { k: "entry", t: "進場建議" },
   { k: "stealth", t: "主力潛伏" },
+  { k: "entry", t: "進場建議" },
   { k: "foreign", t: "法人動向" },
   { k: "fund", t: "基本面" },
   { k: "topic", t: "題材熱度" },
@@ -35,7 +35,7 @@ let HPERF = null;
 let ALL_STOCKS = null;
 let SHORTS = null;
 let STEALTH = null;
-let view = "entry";
+let view = "stealth";
 
 async function boot() {
   setupTheme();
