@@ -33,7 +33,7 @@ RWD = "https://www.twse.com.tw/rwd/zh"
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json",
            "Referer": "https://www.twse.com.tw/"}
 
-UNIVERSE_N = 200        # 回測標的池:成交值前 N 大上市股
+UNIVERSE_N = 300        # 回測標的池:成交值前 N 大上市股
 LOOKBACK = 120          # 回填近 N 交易日(約半年,涵蓋更多市況)
 WARMUP = 20             # 前段暖身(算均線/RSI 需要)
 FORWARD = [5, 10, 20]   # 後續報酬窗口(交易日)
