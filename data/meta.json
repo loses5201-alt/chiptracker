@@ -1,11 +1,11 @@
 {
- "updated_at": "2026-06-03T12:57:54+08:00",
- "trading_date": "20260602",
+ "updated_at": "2026-06-03T17:14:17+08:00",
+ "trading_date": "20260603",
  "universe": 120,
  "shown": 40,
  "market_split": {
-  "twse": 40,
-  "tpex": 0
+  "twse": 39,
+  "tpex": 1
  },
  "sources": {
   "twse": true,
@@ -24,41 +24,41 @@
   "蘋果供應鏈": 2.23
  },
  "topic_heat": {
-  "記憶體": 9,
-  "AI伺服器": 23,
-  "CoWoS先進封裝": 2,
+  "記憶體": 7,
+  "AI伺服器": 30,
+  "CoWoS先進封裝": 3,
   "矽光子CPO": 5,
-  "散熱": 5,
-  "機器人": 10,
+  "散熱": 7,
+  "機器人": 11,
   "重電綠能": 0,
   "軍工航太": 0,
   "PCB": 9,
   "矽智財IP": 0,
   "被動元件": 8,
   "蘋果供應鏈": 0,
-  "低軌衛星": 11
+  "低軌衛星": 8
  },
- "yahoo_ok": 120,
+ "yahoo_ok": 199,
  "market_pulse": {
-  "advancers": 998,
-  "decliners": 1059,
-  "unchanged": 172,
-  "breadth_pct": 48.5,
-  "inst_foreign": 108.4,
-  "inst_trust": 28.2,
-  "inst_dealer": -157.7,
-  "inst_total": -21.1,
+  "advancers": 1177,
+  "decliners": 883,
+  "unchanged": 173,
+  "breadth_pct": 57.1,
+  "inst_foreign": 434.0,
+  "inst_trust": 55.7,
+  "inst_dealer": 26.0,
+  "inst_total": 515.7,
   "margin_chg_lots": -40594.0,
   "margin_up_count": 834,
   "hot_topics": [
    {
     "name": "AI伺服器",
-    "heat": 23,
+    "heat": 30,
     "mom": 21.3
    },
    {
     "name": "記憶體",
-    "heat": 9,
+    "heat": 7,
     "mom": 16.9
    },
    {

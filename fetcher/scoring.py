@@ -144,6 +144,61 @@ def score_momentum(closes: list[float], volume: float, avg_vol: float | None) ->
     return max(0, min(15, s)), rsi, pos, ("、".join(notes) or None)
 
 
+def score_short(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
+                fund: dict | None) -> tuple[int, list[str]]:
+    """
+    做空評分(0-100,越高越適合放空)。反向邏輯:高檔回落 + 業績轉弱 + 法人出貨。
+    ⚠️ 做空風險高(軋空、無限損失),此為訊號非建議,務必設停損。
+    """
+    s, reasons = 0, []
+    # 1. 高檔過熱回落(技術,0-38):漲多了、過熱、開始轉弱
+    rsi = ind.rsi(closes)
+    pos = ind.position_in_range(closes, 20)
+    ma5, ma20 = ind.sma(closes, 5), ind.sma(closes, 20)
+    last = closes[-1] if closes else 0
+    if pos is not None and pos >= 85:
+        s += 12
+        reasons.append(f"高檔(區間{pos})")
+    if rsi is not None and rsi >= 78:
+        s += 12
+        reasons.append(f"超買(RSI{rsi})")
+    if ma5 is not None and last and last < ma5:
+        s += 8
+        reasons.append("跌破5日線")
+    if ma5 is not None and ma20 is not None and ma5 < ma20:
+        s += 6
+        reasons.append("均線下彎")
+    # 2. 法人出貨(0-25):三大法人賣超佔成交量比
+    if inst and vol > 0:
+        r = inst.get("total", 0) / vol
+        if r < 0:
+            s += min(25, round(-r * 250))
+            reasons.append("法人賣超")
+    # 3. 業績轉弱(0-25):月營收年減
+    if fund:
+        yoy = fund.get("yoy", 0)
+        if yoy < 0:
+            s += min(25, round(-yoy * 0.6))
+            reasons.append(f"營收年減{yoy:.0f}%")
+    # 4. 融資套牢 / 融券(0-12):融資增+法人賣=散戶套頂;融券減=空方少易跌
+    if mg:
+        if mg.get("margin_bal", 0) - mg.get("margin_prev", 0) > 0 and inst.get("total", 0) < 0:
+            s += 8
+            reasons.append("融資套牢")
+        if mg.get("short_bal", 0) < mg.get("short_prev", 0):
+            s += 4
+    return min(100, s), reasons[:4]
+
+
+def short_grade(score: int) -> str:
+    """做空訊號強度。"""
+    if score >= 60:
+        return "strong"
+    if score >= 45:
+        return "mid"
+    return "watch"
+
+
 def grade(score: int) -> str:
     """總分(滿分 100)轉建議強度。"""
     if score >= 70:

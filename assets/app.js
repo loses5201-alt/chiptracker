@@ -10,6 +10,7 @@ const SCORES = [
   { k: "s6", label: "動能", max: 15, color: "#ec4899" },
 ];
 const REC_TEXT = { strong: "強力建議", mid: "可留意", watch: "觀察" };
+const SHORT_TEXT = { strong: "強烈做空", mid: "留意做空", watch: "觀察" };
 const TABS = [
   { k: "entry", t: "進場建議" },
   { k: "foreign", t: "法人動向" },
@@ -18,6 +19,7 @@ const TABS = [
   { k: "intl", t: "國際連動" },
   { k: "backtest", t: "回測" },
   { k: "overview", t: "總覽" },
+  { k: "short", t: "做空標的" },
   { k: "watch", t: "查詢/自選" },
 ];
 
@@ -29,6 +31,7 @@ let MTREND = null;
 let CHIPS = null;
 let HPERF = null;
 let ALL_STOCKS = null;
+let SHORTS = null;
 let view = "entry";
 
 async function boot() {
@@ -46,6 +49,7 @@ async function boot() {
     CHIPS = await fetch("data/stock_chips.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     HPERF = await fetch("data/historical_performance.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     ALL_STOCKS = await fetch("data/all_stocks.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    SHORTS = await fetch("data/shorts.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -88,6 +92,7 @@ function render() {
   if (view === "overview") return renderOverview(box);
   if (view === "topic") return renderTopic(box);
   if (view === "backtest") return renderBacktest(box);
+  if (view === "short") return renderShorts(box);
   if (view === "watch") return renderWatchlist(box);
   let list = [...STOCKS];
   if (view === "foreign") list.sort((a, b) => b.s1 - a.s1);
@@ -689,6 +694,70 @@ function renderSkeleton() {
   const sk = `<div class="sk-card"><div class="sk-line w60"></div><div class="sk-line w40"></div>
     <div class="sk-radar"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>`;
   document.getElementById("content").innerHTML = `<div class="grid">${sk.repeat(6)}</div>`;
+}
+
+// ── 做空標的(高檔回落 / 業績轉弱)──
+function shortCard(s, idx) {
+  const badges = (s.reason || []).map((r) => `<span class="badge short">${r}</span>`).join("");
+  return `<div class="card short" data-code="${s.c}" style="--i:${idx}">
+    <div class="rank-badge short">${idx + 1}</div>
+    <div class="card-top">
+      <div class="ct-left">
+        <div class="stock-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
+        <div class="px-row"><span class="stock-px">${s.close || "—"}</span></div>
+      </div>
+      <div class="ct-right">
+        <div class="score-ring short"><span>${s.score}</span><small>空</small></div>
+        <div class="pill short">${SHORT_TEXT[s.rec]}</div>
+      </div>
+    </div>
+    <div class="mid-stats">
+      ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
+      ${statBox("現價", s.close || "—", null)}
+    </div>
+    <div class="badges">${badges}</div>
+    <div class="short-trade">空 ${s.entry} · 停損 ${s.stop}(漲) · 目標 ${s.t1}/${s.t2}(跌)</div>
+    <div class="card-hint">點擊看走勢與做空計畫 ›</div>
+  </div>`;
+}
+
+function renderShorts(box) {
+  if (!SHORTS || !SHORTS.length) {
+    box.innerHTML = '<div class="empty" style="padding:50px">今日無明顯做空標的</div>' + footNote();
+    return;
+  }
+  const intro = `<div class="short-intro"><b>⚠️ 做空訊號(高檔回落 / 業績轉弱)</b> — 做空風險高(軋空、損失無上限),此為程式訊號、非投資建議,務必嚴設停損。</div>`;
+  box.innerHTML = intro + `<div class="grid">${SHORTS.map((s, i) => shortCard(s, i)).join("")}</div>` + footNote();
+  box.querySelectorAll(".card").forEach((el) =>
+    el.addEventListener("click", () => openShortDetail(el.dataset.code)));
+}
+
+function openShortDetail(code) {
+  const s = SHORTS.find((x) => x.c === code);
+  if (!s) return;
+  document.getElementById("modal-body").innerHTML = `
+    <div class="m-head">
+      <div>
+        <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
+        <div class="m-px">${s.close || "—"} <span class="pill short">${SHORT_TEXT[s.rec]} ${s.score}分</span></div>
+      </div>
+      <button class="m-close" id="m-close">✕</button>
+    </div>
+    <div class="note" style="border-left:4px solid #f59e0b">⚠️ 做空訊號,非投資建議。軋空風險高、損失無上限,務必設停損。</div>
+    <div class="m-section">做空理由</div>
+    <div class="m-reason">${(s.reason || []).map((r) => `<span class="badge short">${r}</span>`).join("")}</div>
+    ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
+    <div class="m-section">近 ${s.closes ? s.closes.length : 0} 日走勢</div>
+    ${sparkline(s.closes)}
+    <div class="m-section">參考做空進出場(程式估算,非建議)</div>
+    <div class="trade-grid">
+      <div class="tg-box"><div class="tg-k">空單進場</div><div class="tg-v">${s.entry}</div></div>
+      <div class="tg-box up"><div class="tg-k">停損 漲5%</div><div class="tg-v">${s.stop}</div></div>
+      <div class="tg-box down"><div class="tg-k">目標 跌5%</div><div class="tg-v">${s.t1}</div></div>
+      <div class="tg-box down"><div class="tg-k">目標 跌10%</div><div class="tg-v">${s.t2}</div></div>
+    </div>`;
+  document.getElementById("modal").classList.add("show");
+  document.getElementById("m-close").addEventListener("click", closeModal);
 }
 
 // ── 全市場查詢 + 自選股(localStorage)──

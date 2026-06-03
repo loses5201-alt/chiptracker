@@ -63,8 +63,9 @@ def _get(url: str, tries: int = 3) -> dict | None:
     return None
 
 
-def _universe() -> list[str]:
-    """最新交易日成交值前 N 大的上市普通股(4 碼數字、排除 00 開頭 ETF)。"""
+def _universe(n: int = UNIVERSE_N, offset: int = 0) -> list[str]:
+    """成交值排名 offset~offset+n 的上市普通股(4 碼數字、排除 00 開頭 ETF)。
+    offset=0 取前 N 大(大型);offset>0 可取中小型股做分層對比。"""
     j = _get(f"{OPENAPI}/exchangeReport/STOCK_DAY_ALL")
     rows = []
     for r in (j or []):
@@ -72,7 +73,7 @@ def _universe() -> list[str]:
         if len(code) == 4 and code.isdigit() and not code.startswith("00"):
             rows.append((code, _num(r.get("TradeValue"))))
     rows.sort(key=lambda x: x[1], reverse=True)
-    return [c for c, _ in rows[:UNIVERSE_N]]
+    return [c for c, _ in rows[offset:offset + n]]
 
 
 def _t86_day(ds: str, want: set) -> dict | None:
@@ -176,9 +177,9 @@ def _forward(closes: list[float], i: int, w: int) -> float | None:
     return None
 
 
-def run() -> dict:
-    print(f"歷史回測:取成交值前 {UNIVERSE_N} 大…")
-    universe = _universe()
+def run(universe: list | None = None, write: bool = True) -> dict:
+    universe = universe or _universe()
+    print(f"歷史回測:universe {len(universe)} 檔…")
     if not universe:
         return _write({"status": "no_data", "msg": "無法取得 universe"})
     print(f"  universe {len(universe)} 檔;回填近 {LOOKBACK} 交易日籌碼…")
@@ -267,7 +268,7 @@ def run() -> dict:
         "note": ("評分五分位 q1(最低)~q5(最高)的後續報酬;q5 明顯高於 q1 代表評分有預測力。"
                  "歷史評分僅含可回填的籌碼+技術三面向。"),
     }
-    return _write(result)
+    return _write(result) if write else result
 
 
 def _stat(arr: list, alpha: list | None = None) -> dict:

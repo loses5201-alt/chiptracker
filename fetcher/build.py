@@ -30,6 +30,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 TOP_N = 40
 CANDIDATES = 120
+SHORT_CANDIDATES = 80   # 做空候選池
+SHORT_TOP = 30          # 做空清單顯示數
 HISTORY_CAP = 60
 CHART_DAYS = 30
 TPE = timezone(timedelta(hours=8))
@@ -171,11 +173,27 @@ def main() -> int:
     (DATA / "all_stocks.json").write_text(
         json.dumps(all_scored, ensure_ascii=False), encoding="utf-8")
     cand = cand[:CANDIDATES]
-    print(f"  全市場評分 {len(all_scored)} 檔 / 候選 {len(cand)} 檔")
+    # 做空候選:業績往下(月營收年減)或法人賣超 + 有量(可融券),取最弱一批
+    short_cand = []
+    for code, q in quotes.items():
+        if q.get("close", 0) <= 0 or q.get("volume", 0) <= 0 or code.startswith("00"):
+            continue
+        f = funds.get(code)
+        itotal = inst.get(code, {}).get("total", 0)
+        yoy = f["yoy"] if f else 0
+        if yoy < 0 or itotal < 0:
+            sb = max(0, -yoy) * 0.6 + (max(0, -itotal / q["volume"]) * 200 if q["volume"] > 0 else 0)
+            short_cand.append((code, q, sb))
+    short_cand.sort(key=lambda x: x[2], reverse=True)
+    short_cand = short_cand[:SHORT_CANDIDATES]
+    print(f"  全市場評分 {len(all_scored)} / 做多候選 {len(cand)} / 做空候選 {len(short_cand)}")
 
     print("階段2:回補候選股 Yahoo 歷史 → 算技術面…")
-    yh = hist_src.fetch([(c[0], "tpex" if c[0] in tpex_codes else "twse") for c in cand])
-    print(f"  Yahoo 成功 {len(yh)}/{len(cand)} 檔")
+    _mkt = lambda c: "tpex" if c in tpex_codes else "twse"
+    _fetch_set = {c[0]: _mkt(c[0]) for c in cand}
+    _fetch_set.update({c[0]: _mkt(c[0]) for c in short_cand})  # 做多+做空候選合併去重
+    yh = hist_src.fetch(list(_fetch_set.items()))
+    print(f"  Yahoo 成功 {len(yh)}/{len(_fetch_set)} 檔(做多+做空候選)")
 
     records = []
     for code, q, topic, tmom, bs in cand:
@@ -194,6 +212,30 @@ def main() -> int:
 
     (DATA / "history.json").write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     (DATA / "stocks.json").write_text(json.dumps(top, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    # 做空清單:對做空候選算 short_score(高檔回落 + 業績轉弱 + 法人出貨)
+    shorts = []
+    for code, q, _ in short_cand:
+        closes = yh[code]["closes"] if code in yh else hist["closes"].get(code, [q["close"]])
+        vols = yh[code]["vols"] if code in yh else hist["vols"].get(code, [])
+        avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
+        ss, sreasons = scoring.score_short(inst.get(code, {}), margin.get(code, {}),
+                                           closes, q.get("volume", 0), avg_vol, funds.get(code))
+        close = q.get("close", 0)
+        shorts.append({
+            "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
+            "score": ss, "rec": scoring.short_grade(ss), "close": close,
+            "yoy": round(funds[code]["yoy"], 1) if funds.get(code) else None,
+            "reason": sreasons or ["高檔轉弱"], "closes": closes[-CHART_DAYS:],
+            "entry": f"{close*0.99:.1f}~{close*1.01:.1f}" if close else "—",
+            "stop": f"{close*1.05:.1f}" if close else "—",   # 空單停損=上漲5%
+            "t1": f"{close*0.95:.1f}" if close else "—",     # 目標=下跌5%
+            "t2": f"{close*0.90:.1f}" if close else "—",
+        })
+    shorts.sort(key=lambda r: r["score"], reverse=True)
+    shorts = shorts[:SHORT_TOP]
+    (DATA / "shorts.json").write_text(json.dumps(shorts, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"  做空清單 {len(shorts)} 檔")
 
     # 每日快照:把今天的推薦另存一份帶交易日的檔,供日後回測(收益率/勝率/分組驗證)。
     # stocks.json 隔天會被覆蓋,快照則永久保留 → 這是回測的原料。
