@@ -145,9 +145,11 @@ def score_momentum(closes: list[float], volume: float, avg_vol: float | None) ->
 
 
 def score_short(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
-                fund: dict | None, topic: str | None = None, topic_heat: int = 0) -> tuple[int, list[str]]:
+                fund: dict | None, topic: str | None = None, topic_heat: int = 0,
+                pledge: float | None = None) -> tuple[int, list[str]]:
     """
     做空評分(0-100)。鎖定「大牛市跟風假漲」:乖離過高 + 實質營收沒跟上 + 無題材 + 法人出貨。
+    pledge:董監設質比例%(內部人質押槓桿),高設質=斷頭追繳風險→做空加分。None=無資料。
     ⚠️ 做空風險高(軋空、損失無上限),此為訊號非建議,務必設停損。
     """
     s, reasons = 0, []
@@ -203,6 +205,12 @@ def score_short(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float |
     if mg and mg.get("margin_bal", 0) - mg.get("margin_prev", 0) > 0 and inst.get("total", 0) < 0:
         s += 6
         reasons.append("融資套牢")
+    # 8. 董監高設質(0-8):內部人質押槓桿高,股價跌易被斷頭追繳→助跌
+    if pledge is not None:
+        if pledge >= 60:
+            s += 8; reasons.append(f"董監高質押{pledge:.0f}%")
+        elif pledge >= 40:
+            s += 4; reasons.append(f"董監質押{pledge:.0f}%")
     return min(100, s), reasons[:5]
 
 
@@ -216,7 +224,8 @@ def short_grade(score: int) -> str:
 
 
 def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
-                  big: dict | None = None, inst_streak: int = 0) -> tuple[int, list[str]]:
+                  big: dict | None = None, inst_streak: int = 0,
+                  pledge: float | None = None) -> tuple[int, list[str]]:
     """
     主力潛伏(主力吸籌·底部轉強初期)— 跟著大戶在發動前布局的核心評分。
     抓「大戶/法人默默吃貨 + 股價剛從打底區站上均線轉強、量能溫和放大、但還沒漲多」的發動初期。
@@ -292,6 +301,9 @@ def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float
                 s += 7; reasons.append(f"大戶增持(週+{wchg:.1f}%)")
             elif wchg <= -0.4:
                 s -= 8; reasons.append(f"大戶減持(週{wchg:.1f}%)")
+    # 7. 董監高設質避雷:內部人質押槓桿高,別跟著埋伏(股價弱易引發斷頭賣壓)
+    if pledge is not None and pledge >= 60:
+        s -= 10; reasons.append(f"董監高質押避雷{pledge:.0f}%")
     return max(0, min(100, s)), reasons[:5]
 
 

@@ -26,6 +26,7 @@ from .sources.margin_history import fetch_trend as fetch_margin_trend
 from .sources.inst_history import fetch_trend as fetch_inst_trend
 from .sources.stock_chip_history import fetch as fetch_stock_chips
 from .sources import tdcc_holders
+from .sources import insider_holdings
 from .notify import notify
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -247,11 +248,17 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         funds = {}
         print(f"  基本面失敗(略過):{e}")
+    try:
+        insiders = insider_holdings.fetch()   # 董監設質比例(風險旗標):做空加分、潛伏避雷
+    except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
+        insiders = {}
+        print(f"  董監持股失敗(略過):{e}")
+    _pledge = lambda c: (insiders.get(c) or {}).get("pledge")
     ov_prices = ov_src.momentum(sectors.all_overseas_symbols())
     topic_mom = sectors.topic_overseas_momentum(ov_prices)
     heat = news_src.topic_heat({n: t["kw"] for n, t in sectors.TOPICS.items()})
     hot = sorted(heat.items(), key=lambda x: x[1]["heat"], reverse=True)[:3]
-    print(f"  月營收 {len(funds)} / 海外 {len(ov_prices)} / 新聞熱題 {[h[0] for h in hot]}")
+    print(f"  月營收 {len(funds)} / 海外 {len(ov_prices)} / 董監持股 {len(insiders)} / 新聞熱題 {[h[0] for h in hot]}")
 
     trading_date = twse.trading_date or datetime.now(TPE).strftime("%Y%m%d")
     _now = datetime.now(TPE)
@@ -338,12 +345,14 @@ def main() -> int:
         s_topic, _stm = sectors.best_topic_for(code, topic_mom, heat)
         s_heat = heat.get(s_topic, {}).get("heat", 0) if s_topic else 0
         ss, sreasons = scoring.score_short(inst.get(code, {}), margin.get(code, {}),
-                                           closes, q.get("volume", 0), avg_vol, funds.get(code), s_topic, s_heat)
+                                           closes, q.get("volume", 0), avg_vol, funds.get(code), s_topic, s_heat,
+                                           _pledge(code))
         close = q.get("close", 0)
         shorts.append({
             "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
             "score": ss, "rec": scoring.short_grade(ss), "close": close,
             "yoy": round(funds[code]["yoy"], 1) if funds.get(code) else None,
+            "pledge": _pledge(code),   # 董監設質比例%(內部人質押風險)
             "reason": sreasons or ["高檔轉弱"], "closes": closes[-CHART_DAYS:],
             "entry": f"{close*0.99:.1f}~{close*1.01:.1f}" if close else "—",
             "stop": f"{close*1.05:.1f}" if close else "—",   # 空單停損=上漲5%
@@ -452,7 +461,7 @@ def main() -> int:
         streak = chips.get(code, {}).get("inst_buy_streak", 0)
         big = big_holders.get(code)
         st, sr = scoring.score_stealth(inst.get(code, {}), margin.get(code, {}),
-                                       closes, q.get("volume", 0), avg_vol, big, streak)
+                                       closes, q.get("volume", 0), avg_vol, big, streak, _pledge(code))
         close = q.get("close", 0)
         pos = ind.position_in_range(closes, 60)   # 60 日區間位置 → 埋伏進度條
         rsi = ind.rsi(closes)
@@ -464,6 +473,7 @@ def main() -> int:
             "rsi": rsi if rsi is not None else None,
             "big": round(big["ratio"], 1) if big else None,           # 千張大戶持股%
             "big_chg": big["week_chg"] if big else None,              # 週變化(None=資料未滿2週)
+            "pledge": _pledge(code),                                  # 董監設質比例%(高=避雷)
             "reason": sr or ["法人潛伏"], "closes": closes[-CHART_DAYS:],
             "entry": f"{close*0.98:.1f}~{close*1.02:.1f}" if close else "—",
             "stop": f"{close*0.93:.1f}" if close else "—",   # 潛伏停損較寬(盤整)

@@ -905,7 +905,7 @@ function shortCard(s, idx) {
     </div>
     <div class="mid-stats">
       ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
-      ${statBox("現價", s.close || "—", null)}
+      ${statBox("董監設質", s.pledge != null ? s.pledge + "%" : "—", s.pledge != null ? !(s.pledge >= 40) : null)}
     </div>
     <div class="badges">${badges}</div>
     <div class="short-trade">空 ${s.entry} · 停損 ${s.stop}(漲) · 目標 ${s.t1}/${s.t2}(跌)</div>
