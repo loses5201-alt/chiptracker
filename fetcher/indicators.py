@@ -31,6 +31,22 @@ def rsi(closes: list[float], period: int = 14) -> float | None:
     return round(100 - 100 / (1 + rs), 1)
 
 
+def ma_convergence(closes: list[float], periods=(5, 10, 20)) -> float | None:
+    """
+    均線糾結度:多條均線彼此越靠近(糾結),回傳的離散度(%)越小。
+    離散度 = (最大均線 − 最小均線) / 最新價 × 100。
+    糾結(數值小,如 <2.5%)代表多空在此區間僵持、能量壓縮 → 一旦帶量突破常是發動點,
+    正是「主力潛伏·打底蓄勢」的量化訊號。資料不足或價為 0 回 None。
+    """
+    mas = [sma(closes, p) for p in periods]
+    if any(m is None for m in mas):
+        return None
+    last = closes[-1] if closes else 0
+    if not last:
+        return None
+    return round((max(mas) - min(mas)) / last * 100, 2)
+
+
 def position_in_range(closes: list[float], window: int = 20) -> int | None:
     """
     最新收盤價在近 window 日高低區間中的位置,回 0~100。
