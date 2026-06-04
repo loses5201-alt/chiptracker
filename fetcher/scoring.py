@@ -272,11 +272,9 @@ def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float
         s += 6
     if bias >= 15:
         s -= 8        # 乖離過大(已漲多)扣分
-    # 3b. 均線糾結蓄勢(借鏡籌碼波浪選股):多均線壓縮=能量蓄積,中低基期糾結後常帶量發動。
-    #     僅在中低位(pos≤70)加分,避免高位糾結後續跌。價格序列可回測(run_stealth 可驗)。
-    conv = ind.ma_convergence(closes)
-    if conv is not None and conv <= 2.5 and pos is not None and pos <= 70:
-        s += 8; reasons.append(f"均線糾結蓄勢({conv}%)")
+    # 3b. 均線糾結:原想加分(壓縮蓄勢),但 run_stealth 回測(universe300/160日)證實
+    #     加分後 q5(高分)後續報酬反而變差、q1 變好,四窗口同向 → 不予計分(不憑感覺、依數據)。
+    #     ma_convergence 指標保留供資訊顯示,不影響評分。
     # 4. 量能溫和放大 = 主力進場痕跡(非量縮;量縮其實是沒人理會的弱勢股)
     if avg_vol and avg_vol > 0 and itotal > 0:
         ratio = vol / avg_vol
