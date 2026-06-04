@@ -35,6 +35,7 @@ let HPERF = null;
 let ALL_STOCKS = null;
 let SHORTS = null;
 let STEALTH = null;
+let STEALTH_BT = null;
 let view = "stealth";
 
 async function boot() {
@@ -54,6 +55,7 @@ async function boot() {
     ALL_STOCKS = await fetch("data/all_stocks.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     SHORTS = await fetch("data/shorts.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     STEALTH = await fetch("data/stealth.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    STEALTH_BT = await fetch("data/stealth_backtest.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -469,13 +471,62 @@ function historicalBlock() {
       策略(每交易日買 top${h.top_n}、持有20日)平均報酬 <b>${avg(st.top20)}%</b> vs 同期大盤 <b>${avg(st.bench20)}%</b>。${h.note}</div>`;
 }
 
+// 主力潛伏回測:潛伏分高的股,埋伏後真的會發動嗎?(金色,呼應潛伏分頁)
+function stealthBacktestBlock() {
+  const h = STEALTH_BT;
+  if (!h || h.status !== "ok") return "";
+  const W = h.windows;
+  const qLabel = { q1: "最低分 q1", q2: "q2", q3: "q3", q4: "q4", q5: "最高分 q5" };
+  const qRows = ["q1", "q2", "q3", "q4", "q5"].map((q) =>
+    `<tr><td class="bt-grp">${qLabel[q]}</td>${W.map((w) => {
+      const d = h.quintile[q][String(w)];
+      if (!d || d.avg == null) return `<td class="bt-na">—</td>`;
+      const cls = d.avg >= 0 ? "up" : "down";
+      const a = d.alpha != null ? `α${d.alpha >= 0 ? "+" : ""}${d.alpha} ` : "";
+      return `<td><span class="bt-ret ${cls}">${d.avg >= 0 ? "+" : ""}${d.avg}%</span><span class="bt-sub">${a}勝${d.win_rate}%</span></td>`;
+    }).join("")}</tr>`).join("");
+  // 發動率 + 領先天數摘要卡
+  const trigCards = W.map((w) => {
+    const v = h.trigger_rate[String(w)];
+    return `<div class="mono-box ${v != null && v >= 50 ? "ok" : "na"}"><div class="mono-w">${w}日內</div>
+      <div class="mono-t">${v != null ? v + "% 發動" : "—"}</div></div>`;
+  }).join("");
+  // 潛伏 top vs 動能 top 超額對照
+  const cmpRows = [
+    { k: "stealth_top", t: "主力潛伏 top", c: "#f59e0b" },
+    { k: "momentum_top", t: "動能選股 top（對照）", c: "#64748b" },
+  ].map((g) => `<tr><td class="bt-grp"><span class="dot" style="background:${g.c}"></span>${g.t}</td>
+    ${W.map((w) => {
+      const d = h[g.k][String(w)];
+      if (!d || d.alpha == null) return `<td class="bt-na">—</td>`;
+      const cls = d.alpha >= 0 ? "up" : "down";
+      return `<td><span class="bt-ret ${cls}">α${d.alpha >= 0 ? "+" : ""}${d.alpha}</span><span class="bt-sub">勝${d.win_rate}%</span></td>`;
+    }).join("")}</tr>`).join("");
+  // 結論:潛伏 top 是否多數窗口超額為正
+  const stPos = W.filter((w) => { const d = h.stealth_top[String(w)]; return d && d.alpha != null && d.alpha > 0; }).length;
+  const lead = h.lead_days_median;
+  const concl = stPos >= Math.ceil(W.length / 2)
+    ? `<div class="note" style="border-left:4px solid #f59e0b"><b>✓ 潛伏邏輯有效:</b>主力潛伏 top 多數窗口超額報酬為正${lead != null ? `,埋伏後中位數 <b>${lead} 個交易日</b>內首次達 +${h.lead_pct}%` : ""} — 確實能提前抓到發動前的標的。</div>`
+    : `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 潛伏邏輯待強化:</b>top 超額尚不穩定,將依此回測調整潛伏評分權重(低基期/連買/量縮),再以集保大戶資料強化。</div>`;
+  return `<div class="m-section">🪙 主力潛伏回測（${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")}）</div>
+    <div class="note" style="margin-top:0">驗證核心問題:<b>潛伏分高的股,埋伏後真的會「發動」嗎?</b>標的池成交值前 ${h.universe} 大上市股。</div>
+    <div class="m-section" style="font-size:12.5px">潛伏分五分位後續報酬(最高分 q5 應高於最低分 q1)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr><th>分位</th>${W.map((w) => `<th>${w} 日</th>`).join("")}</tr></thead><tbody>${qRows}</tbody></table></div>
+    <div class="m-section" style="font-size:12.5px">發動率(潛伏 top 埋伏後最高漲幅 ≥ ${h.trigger_pct}% 的比例)</div>
+    <div class="mono-grid">${trigCards}</div>
+    <div class="m-section" style="font-size:12.5px">主力潛伏 vs 動能選股 超額報酬對照(證明「提前」的價值)</div>
+    <div class="table-wrap"><table class="bt-table"><thead><tr><th>策略</th>${W.map((w) => `<th>${w} 日</th>`).join("")}</tr></thead><tbody>${cmpRows}</tbody></table></div>
+    ${concl}`;
+}
+
 // 回測分頁:驗證「分數越高、後續越會漲嗎?」
 function renderBacktest(box) {
+  const sb = stealthBacktestBlock();
   const wr = weightReviewBlock();
   const hb = historicalBlock();
   if (!PERF || PERF.status !== "ok") {
     const msg = PERF && PERF.msg ? PERF.msg : "回測資料尚未產生。";
-    box.innerHTML = wr + hb + `<div class="bt-intro">
+    box.innerHTML = sb + wr + hb + `<div class="bt-intro">
       <h3>📊 推薦成效回測</h3>
       <p>這裡會驗證一件最重要的事:<b>分數越高的股票,之後真的越會漲嗎?</b></p>
       <p class="bt-wait">${msg}</p>
@@ -537,7 +588,7 @@ function renderBacktest(box) {
       return `<td><span class="bt-ret ${cls}">${v >= 0 ? "+" : ""}${v}</span></td>`;
     }).join("")}</tr>`).join("");
 
-  box.innerHTML = wr + hb + `
+  box.innerHTML = sb + wr + hb + `
     <div class="bt-head">
       <div><h3>📊 推薦成效回測</h3>
         <p class="bt-meta">累積 ${PERF.snapshot_days} 個交易日 · 評估 ${PERF.recommendations_seen} 筆推薦 ·

@@ -218,46 +218,60 @@ def short_grade(score: int) -> str:
 def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
                   fund: dict | None, inst_streak: int = 0) -> tuple[int, list[str]]:
     """
-    主力潛伏(起漲前)— 跟著大戶提前布局的核心評分。
-    抓「大戶/法人偷偷吃貨、但股價還沒發動」的股,提前進場。與動能選股相反:懲罰高位/過熱/漲多。
+    主力潛伏(主力吸籌·底部轉強初期)— 跟著大戶在發動前布局的核心評分。
+    抓「大戶/法人默默吃貨 + 股價剛從打底區站上均線轉強、量能溫和放大、但還沒漲多」的發動初期。
+    與「深度抄底」不同:不追最低的破底弱勢股(弱勢易續弱),也不追高位過熱股。
+    ⚠️ 歷史回測修正版(原「位置越低+量縮越加分」被驗為反向,改獎勵打底完成+轉強)。
     ⚠️ 仍是訊號非建議;潛伏股可能盤更久或不發動,需耐心與停損。
     """
     s, reasons = 0, []
     pos = ind.position_in_range(closes, 60)   # 60 日區間看基期高低
     rsi = ind.rsi(closes)
     ma20 = ind.sma(closes, 20)
+    ma5 = ind.sma(closes, 5)
     last = closes[-1] if closes else 0
     bias = ((last - ma20) / ma20 * 100) if (ma20 and last) else 0
     itotal = inst.get("total", 0) if inst else 0
 
-    # 1. 法人吸籌(核心):默默買 + 連續買 = 大戶在布局
+    # 1. 法人吸籌(核心):默默買 + 連續買 + 散戶退場 = 大戶在布局
     if vol > 0 and itotal > 0:
         s += min(22, round(itotal / vol * 220)); reasons.append("法人吃貨")
     if inst_streak >= 3:
         s += min(16, inst_streak * 3); reasons.append(f"法人連買{inst_streak}天")
-    # 2. 低基期:還沒漲 = 位置低 + 乖離小
-    if pos is not None:
-        if pos <= 35:
-            s += 20; reasons.append(f"低基期(位置{pos})")
-        elif pos <= 55:
-            s += 11; reasons.append(f"中低基期(位置{pos})")
-        elif pos >= 80:
-            s -= 12   # 高位追高,扣分
-    if abs(bias) <= 6:
-        s += 8; reasons.append("貼近均線未漲多")
-    elif bias >= 15:
-        s -= 8        # 乖離過大(已漲多)扣分
-    # 3. 籌碼沉澱:散戶退場(融資減)+ 法人進 = 籌碼變乾淨
     if mg and itotal > 0 and mg.get("margin_bal", 0) - mg.get("margin_prev", 0) < 0:
         s += 12; reasons.append("散戶退場法人進")
-    # 4. 還沒發動:RSI 中性 + 量縮(沒被市場發現)
+    # 2. 中低基期:打底完成剛起步最佳(不追高、也不抄破底弱勢股)
+    #    ⚠️ 回測修正:原本「位置越低越加分」會選到弱勢續弱股(q5 反而最差),
+    #    改成獎勵「打底完成的中低位」,最低位(可能仍在破底)只小加。
+    if pos is not None:
+        if 30 <= pos <= 65:
+            s += 18; reasons.append(f"打底完成(位置{pos})")
+        elif pos < 30:
+            s += 8; reasons.append(f"低基期(位置{pos})")
+        elif pos <= 80:
+            s += 4
+        else:
+            s -= 12   # 高位追高,扣分
+    # 3. 底部轉強訊號(主力發動初期):站上月線 + 短均上彎(取代原「量縮、貼均線沒漲」)
+    if ma20 and last and last > ma20:
+        s += 10; reasons.append("站上月線轉強")
+    if ma5 and ma20 and ma5 > ma20:
+        s += 6
+    if bias >= 15:
+        s -= 8        # 乖離過大(已漲多)扣分
+    # 4. 量能溫和放大 = 主力進場痕跡(非量縮;量縮其實是沒人理會的弱勢股)
+    if avg_vol and avg_vol > 0 and itotal > 0:
+        ratio = vol / avg_vol
+        if 1.0 <= ratio <= 2.2:
+            s += 8; reasons.append("量溫放大主力進")
+        elif ratio > 2.8:
+            s -= 6     # 爆量(可能追高/出貨)
+    # 5. RSI 轉強未過熱(脫離弱勢、尚未過熱)
     if rsi is not None:
-        if 42 <= rsi <= 62:
-            s += 8; reasons.append("動能未過熱")
-        elif rsi > 72:
+        if 50 <= rsi <= 68:
+            s += 8; reasons.append("動能轉強未過熱")
+        elif rsi > 75:
             s -= 8
-    if avg_vol and vol < avg_vol * 1.2 and itotal > 0:
-        s += 6; reasons.append("量縮默吃")
     return max(0, min(100, s)), reasons[:5]
 
 

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from fetcher import scoring, sectors
 from fetcher.sources.price_history import PriceHistorySource, fetch_symbol
+from fetcher.sources.stock_chip_history import _buy_streak  # 連買天數(與正式版同一套邏輯)
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -34,11 +35,18 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": 
            "Referer": "https://www.twse.com.tw/"}
 
 UNIVERSE_N = 300        # 回測標的池:成交值前 N 大上市股
-LOOKBACK = 120          # 回填近 N 交易日(約半年,涵蓋更多市況)
+LOOKBACK = 240          # 回填近 N 交易日(約一年,涵蓋多/空不同市況,避免純多頭小樣本假象)
 WARMUP = 20             # 前段暖身(算均線/RSI 需要)
 FORWARD = [5, 10, 20]   # 後續報酬窗口(交易日)
 TOP_N = 10              # 每日選前幾名當「策略持股」
 BENCHMARK = "^TWII"
+
+# 潛伏回測:潛伏要等發動,窗口拉長(5/10 日太短)
+STEALTH_FORWARD = [10, 20, 40, 60]
+TRIGGER_PCT = 10.0      # 發動門檻:埋伏後最高漲幅 ≥ 此值算「發動」
+LEAD_PCT = 8.0          # 領先:埋伏後首次達此漲幅的交易日數
+# 潛伏是中小型股策略(大型股法人本就重倉、無「偷偷吃貨」),回測用中型股池才公允
+STEALTH_OFFSET = 150    # 成交值排名 offset(取 rank 150~150+UNIVERSE_N 的中型股)
 
 # T86 個股法人欄位 index(同 sources/twse.py)
 _FOREIGN, _FDEALER, _TRUST, _DEALER, _TOTAL = 4, 7, 10, 11, 18
@@ -141,7 +149,7 @@ def _backfill_overseas() -> dict:
     """抓題材表所有海外標的歷史(Yahoo),供回測算各交易日的題材海外動能。"""
     out = {}
     for sym in sectors.all_overseas_symbols():
-        d = fetch_symbol(sym, "6mo")
+        d = fetch_symbol(sym, "2y")
         if d:
             out[sym] = d
     return out
@@ -282,16 +290,177 @@ def _stat(arr: list, alpha: list | None = None) -> dict:
     return out
 
 
-def _monotonic(quint: dict) -> dict:
+def _monotonic(quint: dict, windows: list = FORWARD) -> dict:
     """各窗口:q5≥q4≥q3≥q2≥q1?(分數越高報酬越高=有預測力)"""
     out = {}
-    for w in FORWARD:
+    for w in windows:
         avgs = [sum(quint[q][w]) / len(quint[q][w]) if quint[q][w] else None for q in range(5)]
         if any(a is None for a in avgs):
             out[str(w)] = None
         else:
             out[str(w)] = all(avgs[i] <= avgs[i + 1] for i in range(4))
     return out
+
+
+# ───────────────────────── 潛伏回測(主力潛伏專用) ─────────────────────────
+
+def _peak_gain(closes: list, i: int, w: int) -> float | None:
+    """埋伏日 i 之後 w 個交易日內的最高漲幅%(用收盤近似最高)。"""
+    if i >= len(closes) or closes[i] <= 0:
+        return None
+    seg = closes[i + 1:i + 1 + w]
+    if not seg:
+        return None
+    return round((max(seg) - closes[i]) / closes[i] * 100, 2)
+
+
+def _days_to(closes: list, i: int, w: int, thr: float) -> int | None:
+    """埋伏後首次達 thr% 漲幅的交易日數(領先天數);未達回 None。"""
+    if i >= len(closes) or closes[i] <= 0:
+        return None
+    for k in range(1, w + 1):
+        if i + k < len(closes) and (closes[i + k] - closes[i]) / closes[i] * 100 >= thr:
+            return k
+    return None
+
+
+def _median(arr: list) -> float | None:
+    if not arr:
+        return None
+    s = sorted(arr)
+    n = len(s)
+    return s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1)
+
+
+def _streak_at(code: str, ds: str, inst_d: dict, days: list) -> int:
+    """交易日 ds 當下的法人連買天數(近10日 total 序列套 _buy_streak)。"""
+    series = []
+    for d in days:
+        if d > ds:
+            break
+        rec = inst_d.get(d, {}).get(code)
+        if rec is not None:
+            series.append(rec.get("total", 0))
+    return _buy_streak(series[-10:])
+
+
+def run_stealth(universe: list | None = None, write: bool = True) -> dict:
+    """驗證主力潛伏:潛伏分高的股,埋伏後是否真的會發動(比大盤/比動能選股更強)。"""
+    universe = universe or _universe()
+    print(f"潛伏回測:universe {len(universe)} 檔…")
+    if not universe:
+        return _write_stealth({"status": "no_data", "msg": "無法取得 universe"})
+    inst_d, mg_d, days = _backfill_chips(universe)
+    print(f"  籌碼回填 {len(days)} 交易日;抓 Yahoo 價量…")
+    px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12, rng="2y")
+    index = fetch_symbol(BENCHMARK, "2y")
+    ov_hist = _backfill_overseas()
+    print(f"  價量 {len(px)}/{len(universe)} 檔;海外 {len(ov_hist)} 檔;開始潛伏回測…")
+
+    W = STEALTH_FORWARD
+    maxw = max(W)
+    test_days = days[WARMUP: len(days) - maxw] if len(days) > WARMUP + maxw else []
+    quint = {q: {w: [] for w in W} for q in range(5)}
+    quint_a = {q: {w: [] for w in W} for q in range(5)}
+    st_ret = {w: [] for w in W}; st_alpha = {w: [] for w in W}      # 潛伏 top
+    mom_ret = {w: [] for w in W}; mom_alpha = {w: [] for w in W}    # 對照:動能 top
+    trig = {w: [] for w in W}                                       # 發動(0/1)
+    lead = []                                                       # 領先天數
+    idx_dates = index["dates"] if index else []
+    idx_closes = index["closes"] if index else []
+
+    for ds in test_days:
+        tmom = _topic_mom_at(ds, ov_hist)
+        st_scored, mom_scored = [], []
+        for code in universe:
+            p = px.get(code)
+            if not p or ds not in p["dates"]:
+                continue
+            i = p["dates"].index(ds)
+            if i < WARMUP:
+                continue
+            closes = p["closes"][:i + 1]
+            vol = p["vols"][i]
+            avg_vol = sum(p["vols"][i - 5:i]) / 5 if i >= 5 else None
+            inst = inst_d.get(ds, {}).get(code, {})
+            mg = mg_d.get(ds, {}).get(code, {})
+            streak = _streak_at(code, ds, inst_d, days)
+            sc, _ = scoring.score_stealth(inst, mg, closes, vol, avg_vol, None, streak)
+            st_scored.append((sc, code, i))
+            topic, tm = sectors.best_topic_for(code, tmom)
+            msc = _simplified_score(inst, mg, closes, vol, avg_vol, topic, tm)
+            mom_scored.append((msc, code, i))
+        if len(st_scored) < 10:
+            continue
+        ib = idx_dates.index(ds) if ds in idx_dates else -1
+        bench = {w: _forward(idx_closes, ib, w) if ib >= 0 else None for w in W}
+
+        # 潛伏分五分位後續報酬
+        st_scored.sort(key=lambda x: x[0])
+        n = len(st_scored)
+        for rank, (sc, code, i) in enumerate(st_scored):
+            q = min(4, rank * 5 // n)
+            p = px[code]
+            for w in W:
+                fr = _forward(p["closes"], i, w)
+                if fr is not None:
+                    quint[q][w].append(fr)
+                    if bench[w] is not None:
+                        quint_a[q][w].append(fr - bench[w])
+        # 潛伏 top:報酬 + 發動率 + 領先天數
+        st_top = st_scored[-TOP_N:]
+        for w in W:
+            rs = [_forward(px[c]["closes"], i, w) for _, c, i in st_top]
+            rs = [r for r in rs if r is not None]
+            if rs:
+                avg = sum(rs) / len(rs)
+                st_ret[w].append(avg)
+                if bench[w] is not None:
+                    st_alpha[w].append(avg - bench[w])
+            for _, c, i in st_top:
+                pg = _peak_gain(px[c]["closes"], i, w)
+                if pg is not None:
+                    trig[w].append(1 if pg >= TRIGGER_PCT else 0)
+        for _, c, i in st_top:
+            k = _days_to(px[c]["closes"], i, maxw, LEAD_PCT)
+            if k is not None:
+                lead.append(k)
+        # 對照:動能 top 同期報酬
+        mom_scored.sort(key=lambda x: x[0])
+        mom_top = mom_scored[-TOP_N:]
+        for w in W:
+            rs = [_forward(px[c]["closes"], i, w) for _, c, i in mom_top]
+            rs = [r for r in rs if r is not None]
+            if rs:
+                avg = sum(rs) / len(rs)
+                mom_ret[w].append(avg)
+                if bench[w] is not None:
+                    mom_alpha[w].append(avg - bench[w])
+
+    result = {
+        "status": "ok",
+        "generated_at": datetime.now(TPE).isoformat(timespec="seconds"),
+        "universe": len(universe), "trading_days": len(days), "test_days": len(test_days),
+        "date_range": [days[0], days[-1]] if days else [],
+        "windows": W, "top_n": TOP_N, "benchmark": BENCHMARK,
+        "trigger_pct": TRIGGER_PCT, "lead_pct": LEAD_PCT,
+        "quintile": {f"q{q+1}": {str(w): _stat(quint[q][w], quint_a[q][w]) for w in W} for q in range(5)},
+        "stealth_top": {str(w): _stat(st_ret[w], st_alpha[w]) for w in W},
+        "momentum_top": {str(w): _stat(mom_ret[w], mom_alpha[w]) for w in W},
+        "trigger_rate": {str(w): (round(sum(trig[w]) / len(trig[w]) * 100, 1) if trig[w] else None) for w in W},
+        "lead_days_median": _median(lead), "lead_n": len(lead),
+        "monotonic": _monotonic(quint_a, W),
+        "note": ("潛伏分五分位後續報酬(q5最高分);發動率=潛伏top埋伏後最高漲幅≥門檻比例;"
+                 "領先天數=首次達標的中位數交易日;momentum_top 為動能選股對照組。"),
+    }
+    return _write_stealth(result) if write else result
+
+
+def _write_stealth(result: dict) -> dict:
+    DATA.mkdir(exist_ok=True)
+    (DATA / "stealth_backtest.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+    return result
 
 
 def _write(result: dict) -> dict:
@@ -303,6 +472,34 @@ def _write(result: dict) -> dict:
 
 if __name__ == "__main__":
     import sys
+    if "--stealth" in sys.argv:
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # 終端 cp950 印不出 ≥/α
+        except Exception:  # noqa: BLE001
+            pass
+        # 大型股池(offset=0)對潛伏不公平;預設用中型股池,加 --large 才測大型對比
+        off = 0 if "--large" in sys.argv else STEALTH_OFFSET
+        uni = _universe(UNIVERSE_N, offset=off)
+        print(f"潛伏回測標的池:成交值 rank {off}~{off + UNIVERSE_N}（{'大型' if off == 0 else '中型'}股)")
+        r = run_stealth(uni)
+        if r["status"] == "ok":
+            print(f"\n潛伏回測:universe {r['universe']} / 回測 {r['test_days']} 日 / {r['date_range']}")
+            print("潛伏分五分位後續報酬(q1最低 → q5最高):")
+            for q in range(1, 6):
+                cells = " | ".join(f"{w}日 {r['quintile'][f'q{q}'][str(w)]['avg']}%"
+                                   f"(α{r['quintile'][f'q{q}'][str(w)].get('alpha')})" for w in r["windows"])
+                print(f"  q{q}: {cells}")
+            print("發動率(埋伏後最高漲幅>=%d%%): " % int(r["trigger_pct"])
+                  + " | ".join(f"{w}日 {r['trigger_rate'][str(w)]}%" for w in r["windows"]))
+            print(f"領先天數中位數(首達+{int(r['lead_pct'])}%): {r['lead_days_median']} 日(n={r['lead_n']})")
+            print("潛伏top vs 動能top 超額α:")
+            for w in r["windows"]:
+                print(f"  {w}日: 潛伏 α={r['stealth_top'][str(w)].get('alpha')} | "
+                      f"動能 α={r['momentum_top'][str(w)].get('alpha')}")
+            print(f"單調性(q5≥…≥q1): {r['monotonic']}")
+        else:
+            print(r.get("msg"))
+        sys.exit(0)
     r = run()
     if r["status"] == "ok":
         print(f"\n完成:universe {r['universe']} / 回測 {r['test_days']} 日 / {r['date_range']}")
