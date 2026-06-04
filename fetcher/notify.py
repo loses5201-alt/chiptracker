@@ -29,7 +29,10 @@ def _fmt_date(d: str) -> str:
 
 
 def build_payload(stealth: list, watch: dict, trading_date: str) -> dict:
-    """組 Discord embed:今日發動股(高優先)+ 今日潛伏 Top5。"""
+    """
+    組 Discord embed。優先序:🚀 已發動(實際放量突破,真正「抓到了」的)→
+    🎯 今日主推(分數最高的潛伏股,帶數據理由)→ 其他潛伏精選。
+    """
     w = (watch or {}).get("watch", {})
     fired = [
         {"c": c, **e} for c, e in w.items()
@@ -38,21 +41,34 @@ def build_payload(stealth: list, watch: dict, trading_date: str) -> dict:
     has_fire = bool(fired)
     fields = []
 
+    # 🚀 已發動 — 真正的主角(實際放量突破,從埋伏抓到起漲)
     if has_fire:
         lines = []
         for e in sorted(fired, key=lambda x: x.get("cur_ret", 0), reverse=True):
             ret = e.get("cur_ret", e.get("trig_ret", 0))
             sign = "+" if ret >= 0 else ""
             lines.append(f"**{e['n']}** `{e['c']}` 進榜 {e.get('enter_px','?')} → {sign}{ret}%(埋伏 {e.get('age','?')} 日)")
-        fields.append({"name": f"🚀 今日發動 {len(fired)} 檔(放量突破·該進場訊號)", "value": "\n".join(lines)[:1024], "inline": False})
+        fields.append({"name": f"🚀 發動快報 · {len(fired)} 檔放量突破(從埋伏抓到起漲)",
+                       "value": "\n".join(lines)[:1024], "inline": False})
 
-    top = (stealth or [])[:5]
+    top = stealth or []
+    # 🎯 今日主推 — 分數最高那檔,帶「為什麼是這檔」的數據理由
     if top:
+        s = top[0]
+        big = f"千張大戶 {s['big']}%" + (f"(週{'+' if (s.get('big_chg') or 0) >= 0 else ''}{s['big_chg']}%)" if s.get("big_chg") is not None else "") if s.get("big") is not None else ""
+        why = "、".join((s.get("reason") or [])[:3]) or "法人低基期吃貨"
+        detail = f"**{s['n']}** `{s['c']}`　{s['score']}伏 · 區間位置 {s.get('pos','?')}\n" \
+                 f"📊 {why}" + (f"\n🏦 {big}" if big else "")
+        fields.append({"name": "🎯 今日主推潛伏(大戶低基期布局)", "value": detail[:1024], "inline": False})
+
+    # 其他潛伏(2~5 名,精簡列)
+    rest = top[1:5]
+    if rest:
         lines = []
-        for i, s in enumerate(top, 1):
+        for i, s in enumerate(rest, 2):
             big = f" · 大戶{s['big']}%" if s.get("big") is not None else ""
             lines.append(f"{i}. **{s['n']}** `{s['c']}` · {s['score']}伏{big} · 位置{s.get('pos','?')}")
-        fields.append({"name": "🎯 今日主力潛伏 Top5(起漲前埋伏)", "value": "\n".join(lines)[:1024], "inline": False})
+        fields.append({"name": "📋 其他潛伏觀察", "value": "\n".join(lines)[:1024], "inline": False})
 
     title = f"🚀 主力潛伏發動快報 · {_fmt_date(trading_date)}" if has_fire \
         else f"🎯 主力潛伏精選 · {_fmt_date(trading_date)}"
@@ -62,9 +78,9 @@ def build_payload(stealth: list, watch: dict, trading_date: str) -> dict:
             "title": title,
             "url": SITE,
             "color": RED if has_fire else GOLD,
-            "description": "跟著大戶提前埋伏。點標題開網站看完整走勢與布局。",
+            "description": "大戶在低基期默默吃貨、還沒發動的股票。點標題開網站看走勢與布局計畫。",
             "fields": fields or [{"name": "今日無潛伏標的", "value": "法人尚未明顯在低基期吃貨。", "inline": False}],
-            "footer": {"text": "ChipTracker · 程式訊號,非投資建議,務必停損"},
+            "footer": {"text": "潛伏=提前埋伏候選(回測純多頭無超額),非投資建議,務必停損"},
         }],
     }
 
