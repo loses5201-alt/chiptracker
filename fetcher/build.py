@@ -26,6 +26,7 @@ from .sources.margin_history import fetch_trend as fetch_margin_trend
 from .sources.inst_history import fetch_trend as fetch_inst_trend
 from .sources.stock_chip_history import fetch as fetch_stock_chips
 from .sources import tdcc_holders
+from .notify import notify
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -475,12 +476,16 @@ def main() -> int:
     print(f"  主力潛伏 {len(stealth)} 檔")
 
     # 潛伏發動追蹤(Phase C):累積在榜股 → 偵測發動(放量+突破+站20MA),前端「已發動」區
+    watch = {"watch": {}}
     try:
         watch = update_stealth_watch(stealth, quotes, yh, hist, trading_date)
         _trig = sum(1 for e in watch["watch"].values() if e.get("triggered_date"))
         print(f"  潛伏追蹤 {len(watch['watch'])} 檔(已發動 {_trig})")
     except Exception as e:  # noqa: BLE001 — 追蹤失敗不影響主資料
         print(f"  潛伏追蹤失敗(略過):{e}")
+
+    # Discord 推播(發動快報推到手機):無 DISCORD_WEBHOOK 金鑰則自動略過
+    print(f"  Discord 推播:{notify(stealth, watch, trading_date)}")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")

@@ -46,3 +46,16 @@ python -m http.server 8000
 
 - GitHub → Settings → Actions → Workflow permissions 需設為 **Read and write**(讓 Actions 能 commit `data/`)。
 - 首次可到 Actions 頁手動觸發 `daily-fetch` 跑一次。
+
+## 手機推播設定(選用 — Discord)
+
+潛伏股「發動」(放量突破)時,自動推一張訊息卡到 Discord 頻道,**手機裝 Discord App 就會收到通知**。
+沒設定也不影響資料更新(`fetcher/notify.py` 偵測不到金鑰會自動略過)。
+
+1. **建立 Webhook**:Discord 任一伺服器 → 你要收通知的頻道 → 編輯頻道 → 整合 → 建立 Webhook → 複製 Webhook URL。
+2. **設成 GitHub Secret**:本 repo → Settings → Secrets and variables → Actions → New repository secret,
+   名稱填 `DISCORD_WEBHOOK`、值貼 Webhook URL。
+3. **手機收通知**:手機安裝 Discord App、登入同一伺服器、開啟該頻道通知即可。
+
+之後每交易日 build 完會推「今日潛伏 Top5」;有股票發動時標紅推「🚀 發動快報」。同一交易日只推一次。
+本機可先預覽訊息格式(不送出):`python -m fetcher.notify`。

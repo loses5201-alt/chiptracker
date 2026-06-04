@@ -38,6 +38,10 @@ jobs:
         run: python -m fetcher.validate
 
       - name: Build data
+        # DISCORD_WEBHOOK 為選用 Secret:設了就推播潛伏發動快報到 Discord(手機可收),
+        # 沒設則 build 內自動略過、不影響資料更新。
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python -m fetcher.build
 
       - name: Run backtest
