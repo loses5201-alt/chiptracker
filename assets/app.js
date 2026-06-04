@@ -79,7 +79,7 @@ function renderMeta() {
     `<span class="meta-main">候選 <b>${META.universe || 0}</b> 檔 · 交易日 <b>${META.trading_date || "—"}</b>${split}</span>` +
     `<span class="meta-src">` +
     chip(s.tpex, "上櫃") + chip(s.history, "技術") + chip(s.fundamentals, "基本面") +
-    chip(s.overseas, "國際") + chip(s.news, "新聞") + chip(s.broker, "分點") +
+    chip(s.overseas, "國際") + chip(s.news, "新聞") + chip(s.tdcc, "大戶") + chip(s.broker, "分點") +
     `</span><span class="meta-upd">更新 ${upd}</span>`;
 }
 
@@ -767,6 +767,14 @@ function renderSkeleton() {
 }
 
 // ── 主力潛伏(起漲前布局:大戶吃貨、還沒發動)──
+// 集保千張大戶持股顯示:「X%」或「X% ▲+Y」(週變化,null=資料未滿兩週)
+function bigText(s) {
+  if (s.big == null) return "—";
+  if (s.big_chg == null) return s.big + "%";
+  const arrow = s.big_chg > 0 ? "▲+" : s.big_chg < 0 ? "▼" : "±";
+  return `${s.big}% <small style="opacity:.85">${arrow}${Math.abs(s.big_chg)}</small>`;
+}
+
 function stealthCard(s, idx) {
   const badges = (s.reason || []).map((r) => `<span class="badge stealth">${r}</span>`).join("");
   return `<div class="card stealth" data-code="${s.c}" style="--i:${idx}">
@@ -783,7 +791,7 @@ function stealthCard(s, idx) {
     </div>
     <div class="mid-stats">
       ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
-      ${statBox("現價", s.close || "—", null)}
+      ${statBox("千張大戶", bigText(s), s.big_chg != null ? s.big_chg >= 0 : null)}
     </div>
     <div class="badges">${badges}</div>
     <div class="short-trade">布局 ${s.entry} · 停損 ${s.stop} · 目標 ${s.t1}/${s.t2}</div>
@@ -816,6 +824,7 @@ function openStealthDetail(code) {
     <div class="note" style="border-left:4px solid #f0b429">🎯 主力潛伏:法人默默吃貨、股價還沒發動。提前布局需耐心(可能先盤整),非投資建議,務必停損。</div>
     <div class="m-section">潛伏理由</div>
     <div class="m-reason">${(s.reason || []).map((r) => `<span class="badge stealth">${r}</span>`).join("")}</div>
+    ${s.big != null ? `<div class="dl"><span class="k">千張大戶持股</span><span class="v ${s.big_chg != null && s.big_chg >= 0 ? "up" : s.big_chg != null ? "down" : ""}">${s.big}%${s.big_chg != null ? `(週${s.big_chg >= 0 ? "+" : ""}${s.big_chg}%)` : "(週變化累積中)"}</span></div>` : ""}
     ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
     <div class="m-section">近 ${s.closes ? s.closes.length : 0} 日走勢</div>
     ${sparkline(s.closes)}

@@ -25,6 +25,7 @@ from . import sectors, scoring, market_pulse
 from .sources.margin_history import fetch_trend as fetch_margin_trend
 from .sources.inst_history import fetch_trend as fetch_inst_trend
 from .sources.stock_chip_history import fetch as fetch_stock_chips
+from .sources import tdcc_holders
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -36,6 +37,7 @@ STEALTH_CANDIDATES = 100  # 主力潛伏候選池(法人吃貨的股)
 STEALTH_TOP = 30          # 主力潛伏清單顯示數
 HISTORY_CAP = 60
 CHART_DAYS = 30
+TDCC_CAP = 12  # 保留近 12 週千張大戶持股(算週變化用)
 TPE = timezone(timedelta(hours=8))
 
 
@@ -70,6 +72,34 @@ def update_history(hist: dict, trading_date: str, quotes: dict) -> dict:
         del va[:-HISTORY_CAP]
     hist["last_date"] = trading_date
     return hist
+
+
+def update_tdcc(holders: dict) -> dict:
+    """
+    累積集保千張大戶持股週序列 → 回傳 {code: {ratio, week_chg}} 供潛伏評分。
+    TDCC 只給最新一週,週變化靠每次 build 累積(同 history.json 模式);
+    同一週內多次 build 不重複 append(以資料日期去重)。第一週 week_chg=None(無前一週)。
+    """
+    f = DATA / "tdcc_history.json"
+    h = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"dates": [], "ratios": {}}
+    dates, ratios = h["dates"], h["ratios"]
+    if holders:
+        wk = next(iter(holders.values())).get("date")   # 同一份 CSV 所有 code 同日
+        if wk and wk not in dates:
+            dates.append(wk)
+            del dates[:-TDCC_CAP]
+            for code, d in holders.items():
+                arr = ratios.setdefault(code, [])
+                arr.append(d["ratio"])
+                del arr[:-TDCC_CAP]
+            f.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
+    out: dict[str, dict] = {}
+    for code, arr in ratios.items():
+        if not arr:
+            continue
+        cur, prev = arr[-1], (arr[-2] if len(arr) >= 2 else None)
+        out[code] = {"ratio": cur, "week_chg": round(cur - prev, 2) if prev is not None else None}
+    return out
 
 
 def fmt_lots(shares: float) -> str:
@@ -285,6 +315,15 @@ def main() -> int:
         print(f"  法人趨勢失敗(略過):{e}")
     inst_today = itrend[-1] if itrend else {}
 
+    # 集保千張大戶持股(Phase B):大戶比例週升 + 股價沒漲 = 真吸籌(比 T86 法人更貼近主力)
+    try:
+        big_holders = update_tdcc(tdcc_holders.fetch())
+    except Exception as e:  # noqa: BLE001 — 失敗不影響主資料
+        big_holders = {}
+        print(f"  集保大戶失敗(略過):{e}")
+    _bh_wk = sum(1 for d in big_holders.values() if d.get("week_chg") is not None)
+    print(f"  集保大戶 {len(big_holders)} 檔(已有週變化 {_bh_wk} 檔)")
+
     meta = {
         "updated_at": datetime.now(TPE).isoformat(timespec="seconds"),
         "trading_date": trading_date,
@@ -298,6 +337,7 @@ def main() -> int:
             "twse": True, "tpex": bool(tp_q), "broker": broker.enabled,
             "fundamentals": bool(funds), "overseas": bool(ov_prices),
             "news": any(v["heat"] for v in heat.values()), "history": bool(yh),
+            "tdcc": bool(big_holders),
         },
         "topic_momentum": topic_mom,
         "topic_heat": {n: d["heat"] for n, d in heat.items()},
@@ -343,13 +383,16 @@ def main() -> int:
         vols = yh[code]["vols"] if code in yh else hist["vols"].get(code, [])
         avg_vol = (sum(vols[-5:]) / len(vols[-5:])) if len(vols) >= 2 else None
         streak = chips.get(code, {}).get("inst_buy_streak", 0)
+        big = big_holders.get(code)
         st, sr = scoring.score_stealth(inst.get(code, {}), margin.get(code, {}),
-                                       closes, q.get("volume", 0), avg_vol, funds.get(code), streak)
+                                       closes, q.get("volume", 0), avg_vol, big, streak)
         close = q.get("close", 0)
         stealth.append({
             "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
             "score": st, "rec": scoring.stealth_grade(st), "close": close,
             "yoy": round(funds[code]["yoy"], 1) if funds.get(code) else None,
+            "big": round(big["ratio"], 1) if big else None,           # 千張大戶持股%
+            "big_chg": big["week_chg"] if big else None,              # 週變化(None=資料未滿2週)
             "reason": sr or ["法人潛伏"], "closes": closes[-CHART_DAYS:],
             "entry": f"{close*0.98:.1f}~{close*1.02:.1f}" if close else "—",
             "stop": f"{close*0.93:.1f}" if close else "—",   # 潛伏停損較寬(盤整)

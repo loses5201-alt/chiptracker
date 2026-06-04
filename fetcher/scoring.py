@@ -216,13 +216,17 @@ def short_grade(score: int) -> str:
 
 
 def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float | None,
-                  fund: dict | None, inst_streak: int = 0) -> tuple[int, list[str]]:
+                  big: dict | None = None, inst_streak: int = 0) -> tuple[int, list[str]]:
     """
     主力潛伏(主力吸籌·底部轉強初期)— 跟著大戶在發動前布局的核心評分。
     抓「大戶/法人默默吃貨 + 股價剛從打底區站上均線轉強、量能溫和放大、但還沒漲多」的發動初期。
     與「深度抄底」不同:不追最低的破底弱勢股(弱勢易續弱),也不追高位過熱股。
     ⚠️ 歷史回測修正版(原「位置越低+量縮越加分」被驗為反向,改獎勵打底完成+轉強)。
     ⚠️ 仍是訊號非建議;潛伏股可能盤更久或不發動,需耐心與停損。
+
+    big:Phase B 集保千張大戶資料 {ratio, week_chg}(週變化,單位 %)。None=無資料/回測。
+        大戶 ≠ 法人:T86 法人買超只是當日機構動向,集保千張大戶比例週週升高才是「真吸籌」。
+        ⚠️ TDCC 無法回填歷史 → 此因子只能前向累積驗證,故權重保守、缺資料時自動退讓。
     """
     s, reasons = 0, []
     pos = ind.position_in_range(closes, 60)   # 60 日區間看基期高低
@@ -272,6 +276,17 @@ def score_stealth(inst: dict, mg: dict, closes: list, vol: float, avg_vol: float
             s += 8; reasons.append("動能轉強未過熱")
         elif rsi > 75:
             s -= 8
+    # 6. 集保千張大戶吸籌(Phase B 真大戶訊號)— 大戶比例週升 + 股價沒漲多 = 默默吃貨
+    #    比 T86 法人買超更貼近「主力」;權重保守(無法回填歷史,僅前向驗證)。
+    if big:
+        wchg = big.get("week_chg")
+        if wchg is not None:
+            if wchg >= 0.4 and bias < 8:
+                s += 14; reasons.append(f"大戶吸籌(週+{wchg:.1f}%)")
+            elif wchg >= 0.15:
+                s += 7; reasons.append(f"大戶增持(週+{wchg:.1f}%)")
+            elif wchg <= -0.4:
+                s -= 8; reasons.append(f"大戶減持(週{wchg:.1f}%)")
     return max(0, min(100, s)), reasons[:5]
 
 
