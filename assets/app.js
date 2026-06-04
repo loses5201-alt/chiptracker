@@ -36,6 +36,7 @@ let ALL_STOCKS = null;
 let SHORTS = null;
 let STEALTH = null;
 let STEALTH_BT = null;
+let STEALTH_WATCH = null;
 let view = "stealth";
 
 async function boot() {
@@ -56,6 +57,7 @@ async function boot() {
     SHORTS = await fetch("data/shorts.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     STEALTH = await fetch("data/stealth.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     STEALTH_BT = await fetch("data/stealth_backtest.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    STEALTH_WATCH = await fetch("data/stealth_watch.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -767,6 +769,24 @@ function renderSkeleton() {
 }
 
 // ── 主力潛伏(起漲前布局:大戶吃貨、還沒發動)──
+// 此股是否已被標記「發動」(Phase C 追蹤)
+function isTriggered(code) {
+  const e = STEALTH_WATCH && STEALTH_WATCH.watch && STEALTH_WATCH.watch[code];
+  return !!(e && e.triggered_date);
+}
+
+// 埋伏進度條(Phase D):用 60 日區間位置視覺化「離發動還多遠」潛伏 → 蓄勢 → 發動
+function stealthProgress(s) {
+  const trig = isTriggered(s.c);
+  const pos = s.pos != null ? s.pos : 50;
+  const pct = trig ? 100 : Math.max(4, Math.min(96, pos));
+  const stage = trig ? "已發動" : pos < 35 ? "深埋伏" : pos <= 65 ? "蓄勢中" : "將發動";
+  return `<div class="stealth-prog${trig ? " fired" : ""}">
+    <div class="sp-track"><div class="sp-fill" style="width:${pct}%"></div><div class="sp-dot" style="left:${pct}%"></div></div>
+    <div class="sp-foot"><div class="sp-labels"><span>潛伏</span><span>蓄勢</span><span>發動</span></div><div class="sp-stage">${trig ? "🚀 " : ""}${stage}</div></div>
+  </div>`;
+}
+
 // 集保千張大戶持股顯示:「X%」或「X% ▲+Y」(週變化,null=資料未滿兩週)
 function bigText(s) {
   if (s.big == null) return "—";
@@ -794,6 +814,7 @@ function stealthCard(s, idx) {
       ${statBox("千張大戶", bigText(s), s.big_chg != null ? s.big_chg >= 0 : null)}
     </div>
     <div class="badges">${badges}</div>
+    ${stealthProgress(s)}
     <div class="short-trade">布局 ${s.entry} · 停損 ${s.stop} · 目標 ${s.t1}/${s.t2}</div>
     <div class="card-hint">點擊看走勢與布局計畫 ›</div>
   </div>`;
@@ -805,9 +826,35 @@ function renderStealth(box) {
     return;
   }
   const intro = `<div class="stealth-intro"><b>🎯 主力潛伏(起漲前布局)</b> — 法人默默吃貨、股價還在低基期沒發動,跟著大戶提前埋伏。<b>這是「跟著大戶賺大錢」的核心</b>。需耐心(可能先盤整),此為程式訊號、非投資建議,務必停損。</div>`;
-  box.innerHTML = intro + `<div class="grid">${STEALTH.map((s, i) => stealthCard(s, i)).join("")}</div>` + footNote();
-  box.querySelectorAll(".card").forEach((el) =>
+  box.innerHTML = intro + firedBlock() + `<div class="grid">${STEALTH.map((s, i) => stealthCard(s, i)).join("")}</div>` + footNote();
+  box.querySelectorAll(".card, .fired-card").forEach((el) =>
     el.addEventListener("click", () => openStealthDetail(el.dataset.code)));
+}
+
+// 🚀 已發動區(Phase C):從埋伏到發動的實際案例,作為「跟著大戶提前埋伏」的活體驗證
+function firedBlock() {
+  const w = STEALTH_WATCH && STEALTH_WATCH.watch;
+  if (!w) return "";
+  const fired = Object.entries(w)
+    .filter(([, e]) => e.triggered_date)
+    .map(([c, e]) => ({ c, ...e }))
+    .sort((a, b) => (b.cur_ret ?? 0) - (a.cur_ret ?? 0));
+  if (!fired.length) return "";
+  const cards = fired.map((e) => {
+    const ret = e.cur_ret ?? e.trig_ret ?? 0;
+    const days = e.age != null ? e.age : "—";
+    return `<div class="fired-card" data-code="${e.c}">
+      <div class="fc-top"><span class="fc-name">${e.n}<span class="stock-code">${e.c}</span></span>
+        <span class="fc-ret ${ret >= 0 ? "up" : "down"}">${ret >= 0 ? "+" : ""}${ret}%</span></div>
+      <div class="fc-meta">進榜 ${e.enter_px}(${fmtDate(e.enter_date)})→ 發動 ${fmtDate(e.triggered_date)} · 埋伏 ${days} 日</div>
+    </div>`;
+  }).join("");
+  return `<div class="fired-wrap"><div class="fired-head">🚀 已發動 <small>埋伏後出現放量突破訊號的潛伏股(${fired.length})</small></div>
+    <div class="fired-grid">${cards}</div></div>`;
+}
+
+function fmtDate(d) {
+  return d && d.length === 8 ? `${d.slice(4, 6)}/${d.slice(6, 8)}` : (d || "—");
 }
 
 function openStealthDetail(code) {
@@ -822,6 +869,8 @@ function openStealthDetail(code) {
       <button class="m-close" id="m-close">✕</button>
     </div>
     <div class="note" style="border-left:4px solid #f0b429">🎯 主力潛伏:法人默默吃貨、股價還沒發動。提前布局需耐心(可能先盤整),非投資建議,務必停損。</div>
+    <div class="m-section">埋伏進度</div>
+    ${stealthProgress(s)}
     <div class="m-section">潛伏理由</div>
     <div class="m-reason">${(s.reason || []).map((r) => `<span class="badge stealth">${r}</span>`).join("")}</div>
     ${s.big != null ? `<div class="dl"><span class="k">千張大戶持股</span><span class="v ${s.big_chg != null && s.big_chg >= 0 ? "up" : s.big_chg != null ? "down" : ""}">${s.big}%${s.big_chg != null ? `(週${s.big_chg >= 0 ? "+" : ""}${s.big_chg}%)` : "(週變化累積中)"}</span></div>` : ""}

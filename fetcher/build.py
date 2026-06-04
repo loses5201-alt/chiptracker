@@ -21,7 +21,7 @@ from .sources.fundamentals import FundamentalsSource
 from .sources.overseas import OverseasSource
 from .sources.news import NewsSource
 from .sources.price_history import PriceHistorySource
-from . import sectors, scoring, market_pulse
+from . import sectors, scoring, market_pulse, indicators as ind
 from .sources.margin_history import fetch_trend as fetch_margin_trend
 from .sources.inst_history import fetch_trend as fetch_inst_trend
 from .sources.stock_chip_history import fetch as fetch_stock_chips
@@ -38,6 +38,8 @@ STEALTH_TOP = 30          # 主力潛伏清單顯示數
 HISTORY_CAP = 60
 CHART_DAYS = 30
 TDCC_CAP = 12  # 保留近 12 週千張大戶持股(算週變化用)
+TRIG_HOLD = 5   # 潛伏股「發動」後保留幾個交易日供展示再移出
+WATCH_MAX = 20  # 未發動且已掉出榜的潛伏股,追蹤上限交易日(超過視為沒發動,移出)
 TPE = timezone(timedelta(hours=8))
 
 
@@ -100,6 +102,70 @@ def update_tdcc(holders: dict) -> dict:
         cur, prev = arr[-1], (arr[-2] if len(arr) >= 2 else None)
         out[code] = {"ratio": cur, "week_chg": round(cur - prev, 2) if prev is not None else None}
     return out
+
+
+def update_stealth_watch(stealth_top: list, quotes: dict, yh: dict, hist: dict,
+                         trading_date: str) -> dict:
+    """
+    潛伏發動追蹤(Phase C,純網站標記)— 把每日潛伏在榜股累積成觀察清單,
+    並偵測「發動」(從埋伏到該進場的訊號):放量 + 突破進榜價 +5% + 站上 20MA。
+    用實際發動案例自我驗證選股(「跟著大戶」是否真能提前埋伏到起漲)。
+
+    狀態檔 data/stealth_watch.json:{watch:{code:{進榜日/價/分、發動日、報酬、追蹤天數}}}。
+    已在榜者保留首次進榜日;發動後保留 TRIG_HOLD 日再移出;未發動且掉榜超過 WATCH_MAX 日視為沒發動移出。
+    同一交易日重複 build 不重複累進(以 last_date 去重)。
+    """
+    f = DATA / "stealth_watch.json"
+    w = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"watch": {}, "last_date": None}
+    watch = w.setdefault("watch", {})
+    new_day = trading_date != w.get("last_date")   # 新交易日才推進 age/發動偵測
+    today_codes = {s["c"] for s in stealth_top}
+
+    # 1. 新進榜:首次出現才記錄進榜日/價/分(已在榜者不覆蓋,保留埋伏起點)
+    for s in stealth_top:
+        if s["c"] not in watch:
+            watch[s["c"]] = {
+                "n": s["n"], "mkt": s["mkt"], "enter_date": trading_date,
+                "enter_px": s["close"], "enter_score": s["score"],
+                "triggered_date": None, "age": 0, "since_trig": 0,
+            }
+
+    # 2. 逐檔更新最新報酬 + 偵測發動(僅新交易日推進,避免同日多次 build 累加)
+    drop = []
+    for code, e in watch.items():
+        closes = (yh.get(code, {}) or {}).get("closes") or hist["closes"].get(code, [])
+        vols = (yh.get(code, {}) or {}).get("vols") or hist["vols"].get(code, [])
+        q = quotes.get(code, {})
+        close = q.get("close") or (closes[-1] if closes else e["enter_px"])
+        vol = q.get("volume", 0)
+        ep = e.get("enter_px") or 0
+        e["cur_ret"] = round((close / ep - 1) * 100, 1) if ep else 0
+        e["in_top"] = code in today_codes
+        if not new_day:
+            continue
+        e["age"] = e.get("age", 0) + 1
+        ma20 = (sum(closes[-20:]) / 20) if len(closes) >= 20 else None
+        avg5 = (sum(vols[-6:-1]) / 5) if len(vols) >= 6 else None
+        if not e.get("triggered_date"):
+            broke = ep and close >= ep * 1.05            # 突破進榜價 +5%
+            volup = avg5 and vol >= avg5 * 1.5            # 放量 ≥1.5× 近5日均量
+            above = ma20 and close >= ma20                # 站上 20MA
+            if broke and volup and above:
+                e["triggered_date"] = trading_date
+                e["trig_ret"] = e["cur_ret"]
+                e["since_trig"] = 0
+            elif not e["in_top"] and e["age"] > WATCH_MAX:
+                drop.append(code)                          # 太久沒發動又掉榜 → 視為沒發動
+        else:
+            e["since_trig"] = e.get("since_trig", 0) + 1
+            if e["since_trig"] > TRIG_HOLD:
+                drop.append(code)                          # 發動展示期滿 → 移出
+    for code in drop:
+        watch.pop(code, None)
+
+    w["last_date"] = trading_date
+    f.write_text(json.dumps(w, ensure_ascii=False), encoding="utf-8")
+    return w
 
 
 def fmt_lots(shares: float) -> str:
@@ -387,10 +453,14 @@ def main() -> int:
         st, sr = scoring.score_stealth(inst.get(code, {}), margin.get(code, {}),
                                        closes, q.get("volume", 0), avg_vol, big, streak)
         close = q.get("close", 0)
+        pos = ind.position_in_range(closes, 60)   # 60 日區間位置 → 埋伏進度條
+        rsi = ind.rsi(closes)
         stealth.append({
             "c": code, "n": q.get("name", ""), "mkt": _mkt(code),
             "score": st, "rec": scoring.stealth_grade(st), "close": close,
             "yoy": round(funds[code]["yoy"], 1) if funds.get(code) else None,
+            "pos": pos if pos is not None else 50,                    # 區間位置(埋伏進度)
+            "rsi": rsi if rsi is not None else None,
             "big": round(big["ratio"], 1) if big else None,           # 千張大戶持股%
             "big_chg": big["week_chg"] if big else None,              # 週變化(None=資料未滿2週)
             "reason": sr or ["法人潛伏"], "closes": closes[-CHART_DAYS:],
@@ -403,6 +473,14 @@ def main() -> int:
     stealth = stealth[:STEALTH_TOP]
     (DATA / "stealth.json").write_text(json.dumps(stealth, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"  主力潛伏 {len(stealth)} 檔")
+
+    # 潛伏發動追蹤(Phase C):累積在榜股 → 偵測發動(放量+突破+站20MA),前端「已發動」區
+    try:
+        watch = update_stealth_watch(stealth, quotes, yh, hist, trading_date)
+        _trig = sum(1 for e in watch["watch"].values() if e.get("triggered_date"))
+        print(f"  潛伏追蹤 {len(watch['watch'])} 檔(已發動 {_trig})")
+    except Exception as e:  # noqa: BLE001 — 追蹤失敗不影響主資料
+        print(f"  潛伏追蹤失敗(略過):{e}")
 
     rsi_ok = sum(1 for r in top if r["rsi"] != "—")
     print(f"完成:top {len(top)};技術面真值 {rsi_ok}/{len(top)};交易日 {trading_date}")
