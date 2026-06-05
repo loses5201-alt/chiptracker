@@ -42,6 +42,12 @@ python -m http.server 8000
 # 瀏覽器開 http://localhost:8000/
 ```
 
+**一鍵看盤(Windows)**:直接雙擊專案根目錄的 **`啟動看盤.bat`** —— 會自動 `git pull` 抓最新資料、
+開瀏覽器、啟動本機伺服器。關閉黑色視窗即停止。(直接雙擊 `index.html` 會因 `fetch` 本機 JSON
+被瀏覽器擋而看不到資料,所以需要這個小伺服器。)
+
+> 想直接看雲端最新版、免開伺服器:https://loses5201-alt.github.io/chiptracker/ (任何裝置瀏覽器皆可)。
+
 ## 部署備註
 
 - GitHub → Settings → Actions → Workflow permissions 需設為 **Read and write**(讓 Actions 能 commit `data/`)。
