@@ -481,6 +481,38 @@ body.dark .fut-oi,body.dark .fut-pc{background:#161922;border-color:#272c38}
 body.dark .fo-k,body.dark .fpc-k{color:#aeb6c6}
 body.dark .fpc-row{border-color:#23283340}
 body.dark .fut-note{background:#161922;color:#aeb6c6}
+/* 期貨延伸:綜合判讀 / 大戶vs散戶 / 個股期貨 */
+.fut-sec-t{font-size:13px;font-weight:700;color:#3a4151;margin:16px 2px 8px}
+.fv-mid{flex:1}
+.fv-tally{font-size:15px;font-weight:600;color:#475067;margin-bottom:6px}
+.fv-tally b{font-size:20px;font-variant-numeric:tabular-nums}
+.fv-sigs{display:flex;flex-wrap:wrap;gap:5px}
+.sig-chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.sig-chip.up{background:rgba(239,68,68,.1);color:#dc2626}.sig-chip.down{background:rgba(22,163,74,.1);color:#15803d}
+.fut-vs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fvs-card{background:#fff;border:1px solid #e8ebf1;border-radius:13px;padding:14px 16px;box-shadow:0 4px 14px rgba(20,30,60,.05)}
+.fvs-k{font-size:12px;color:#475067;margin-bottom:6px;line-height:1.4}
+.fvs-v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.fvs-v.up{color:#ef4444}.fvs-v.down{color:#16a34a}
+.fvs-read{font-size:12px;color:#6b7280;margin-top:3px}
+.fut-ssf{background:#fff;border:1px solid #e8ebf1;border-radius:13px;padding:14px 16px;box-shadow:0 4px 14px rgba(20,30,60,.05)}
+.fssf-inst{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid #f0f2f6;font-size:13px;color:#475067}
+.fssf-i b{font-variant-numeric:tabular-nums}
+.fssf-sub{font-size:12px;color:#6b7280;margin:10px 0 6px}
+.ssf-table{width:100%;border-collapse:collapse;font-size:13px}
+.ssf-table td{padding:6px 4px;border-bottom:1px solid #f3f4f7}
+.ssf-table tr:last-child td{border-bottom:none}
+.sr-rank{color:#9aa1b0;width:24px;font-weight:700}
+.sr-name{font-weight:600;color:#1f2430}
+.ssf-code{color:#9aa1b0;font-size:11px;margin-left:6px;font-weight:400}
+.sr-oi{text-align:right;font-variant-numeric:tabular-nums;color:#475067}
+body.dark .fut-sec-t{color:#c2c8d4}
+body.dark .fv-tally{color:#aeb6c6}
+body.dark .fvs-card,body.dark .fut-ssf{background:#161922;border-color:#272c38}
+body.dark .fvs-k,body.dark .fssf-inst,body.dark .sr-oi{color:#aeb6c6}
+body.dark .fssf-inst{border-color:#23283340}
+body.dark .ssf-table td{border-color:#23283340}
+body.dark .sr-name{color:#e8eaf0}
 
 /* 做空標的(綠系,台股綠跌) */
 .short-intro{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;font-size:13px;color:#b45309;margin-bottom:16px;line-height:1.6}

@@ -792,35 +792,83 @@ function renderFutures(box) {
     return;
   }
   const h = f.history || [];
-  const moodCls = f.verdict === "偏多" ? "bull" : f.verdict === "偏空" ? "bear" : "neutral";
-  // P/C 未平倉比判讀:偏高(>120)=避險買權多、籌碼偏多支撐;偏低(<80)=樂觀過頭偏空
   const pc = f.pc.oi_ratio;
-  const pcRead = pc >= 120 ? "偏多(避險 Put 多、低點有撐)" : pc <= 80 ? "偏空(樂觀過頭)" : "中性";
-  const pcCls = pc >= 120 ? "up" : pc <= 80 ? "down" : "";
+  const retail = f.retail || {}, big5 = f.big5 || {}, ssf = f.ssf || {};
+  const rRatio = retail.ratio, b5net = big5.tx_net;
 
-  const intro = `<div class="fut-intro"><b>📊 期貨風向(大盤多空)</b> — 個股籌碼看「誰買哪檔」,期貨籌碼看「大戶對整個大盤的押注」。<b>外資台指期未平倉</b>是台股最重要的多空風向球;搭配個股潛伏/做空一起看。資料日 ${f.date}。程式訊號、非投資建議。</div>`;
+  // 綜合多空訊號分析:把各面向轉成「多/空」票,統計傾向(這是期貨頁的核心分析)
+  const sig = [];
+  const add = (cond, side, txt) => { if (cond) sig.push({ side, txt }); };
+  add(f.tx.foreign > 10000, "多", "外資台指期淨多單"); add(f.tx.foreign < -10000, "空", "外資台指期淨空單");
+  add(b5net > 3000, "多", "前五大特定法人偏多"); add(b5net < -3000, "空", "前五大特定法人偏空");
+  add(rRatio > 15, "空", "散戶偏多(反指標)"); add(rRatio < -15, "多", "散戶偏空(反指標)");
+  add(pc >= 120, "多", "P/C比偏高(低檔有撐)"); add(pc <= 80, "空", "P/C比偏低(過度樂觀)");
+  const bull = sig.filter((s) => s.side === "多").length, bear = sig.filter((s) => s.side === "空").length;
+  const compCls = bull > bear ? "bull" : bear > bull ? "bear" : "neutral";
+  const compTag = bull > bear ? "偏多" : bear > bull ? "偏空" : "中性";
 
-  const verdict = `<div class="fut-verdict ${moodCls}">
-    <div class="fv-tag">${f.verdict}</div>
-    <div class="fv-reason">${f.verdict_reason}</div>
+  const intro = `<div class="fut-intro"><b>📊 期貨風向(大盤多空)</b> — 個股籌碼看「誰買哪檔」,期貨籌碼看「大戶對整個大盤的押注」。下方<b>綜合判讀</b>把外資/大戶/散戶/選擇權各面向匯總成多空傾向。資料日 ${f.date}。程式訊號、非投資建議。</div>`;
+
+  // 綜合判讀面板(多空票數 + 各訊號)
+  const sigChips = sig.map((s) => `<span class="sig-chip ${s.side === "多" ? "up" : "down"}">${s.txt}</span>`).join("");
+  const verdict = `<div class="fut-verdict ${compCls}">
+    <div class="fv-tag">${compTag}</div>
+    <div class="fv-mid"><div class="fv-tally"><b class="up">${bull}</b> 多 <span class="muted">/</span> <b class="down">${bear}</b> 空</div>
+      <div class="fv-sigs">${sigChips || "今日訊號不明顯"}</div></div>
   </div>`;
 
-  const oiCards = `<div class="fut-oi-grid">
+  const oiCards = `<div class="fut-sec-t">台指期三大法人未平倉</div><div class="fut-oi-grid">
     ${futOiCard("外資台指期", f.tx.foreign, f.tx.foreign_day, h.map((x) => x.foreign))}
     ${futOiCard("投信台指期", f.tx.trust, f.tx.trust_day, h.map((x) => x.trust))}
     ${futOiCard("自營台指期", f.tx.dealer, f.tx.dealer_day, h.map((x) => x.dealer))}
   </div>`;
 
-  const pcBlock = `<div class="fut-pc">
-    <div class="fpc-row"><span class="fpc-k">選擇權 Put/Call 未平倉比</span>
+  // 大戶 vs 散戶
+  const b5Read = b5net > 3000 ? "押多" : b5net < -3000 ? "押空" : "中性";
+  const rRead = rRatio > 15 ? "散戶偏多 → 反指偏空" : rRatio < -15 ? "散戶偏空 → 反指偏多" : "散戶中性";
+  const vsBlock = `<div class="fut-sec-t">大戶 vs 散戶</div><div class="fut-vs">
+    <div class="fvs-card">
+      <div class="fvs-k">前五大特定法人 · 台指期淨(外資主力)</div>
+      <div class="fvs-v ${b5net >= 0 ? "up" : "down"}">${fmtKou(b5net)}</div>
+      <div class="fvs-read">${b5Read}${h.length >= 2 ? "" : ""}</div>
+      ${h.length >= 2 ? miniSpark(h.map((x) => x.big5).filter((v) => v != null), 90, 22) : ""}
+    </div>
+    <div class="fvs-card">
+      <div class="fvs-k">散戶多空比(小台,反指標)</div>
+      <div class="fvs-v ${rRatio >= 0 ? "up" : "down"}">${rRatio >= 0 ? "+" : ""}${rRatio}%</div>
+      <div class="fvs-read">${rRead}</div>
+      ${h.length >= 2 ? miniSpark(h.map((x) => x.retail).filter((v) => v != null), 90, 22) : ""}
+    </div>
+  </div>`;
+
+  // 選擇權 P/C
+  const pcRead = pc >= 120 ? "偏多(避險 Put 多、低點有撐)" : pc <= 80 ? "偏空(樂觀過頭)" : "中性";
+  const pcCls = pc >= 120 ? "up" : pc <= 80 ? "down" : "";
+  const pcBlock = `<div class="fut-sec-t">選擇權情緒</div><div class="fut-pc">
+    <div class="fpc-row"><span class="fpc-k">Put/Call 未平倉比</span>
       <b class="fpc-v ${pcCls}">${pc}%</b><span class="fpc-read">${pcRead}</span>
       ${h.length >= 2 ? miniSpark(h.map((x) => x.pc_oi), 80, 22) : ""}</div>
     <div class="fpc-row"><span class="fpc-k">成交量 P/C 比</span><b class="fpc-v">${f.pc.vol_ratio}%</b></div>
   </div>`;
 
-  box.innerHTML = intro + verdict + oiCards + pcBlock +
-    `<div class="fut-note">📖 怎麼看:外資台指期<b>淨多單(綠/正)</b>=大戶押大盤漲、<b>淨空單(紅/負)</b>=押跌;
-     看「連續加/減碼」比看單日更準。P/C 未平倉比偏高常代表低檔有避險買盤支撐。趨勢需逐日累積(目前 ${h.length} 日)。</div>` +
+  // 個股期貨
+  const ssfRows = (ssf.top || []).map((s, i) =>
+    `<tr><td class="sr-rank">${i + 1}</td><td class="sr-name">${s.name}<span class="ssf-code">${s.code}</span></td><td class="sr-oi">${(s.oi || 0).toLocaleString()} 口</td></tr>`).join("");
+  const ssfBlock = `<div class="fut-sec-t">個股期貨</div><div class="fut-ssf">
+    <div class="fssf-inst">
+      <span class="fssf-i">法人整體未平倉:</span>
+      <span class="fssf-i">外資 <b class="${(ssf.foreign || 0) >= 0 ? "up" : "down"}">${fmtKou(ssf.foreign || 0)}</b></span>
+      <span class="fssf-i">投信 <b class="${(ssf.trust || 0) >= 0 ? "up" : "down"}">${fmtKou(ssf.trust || 0)}</b></span>
+      <span class="fssf-i">自營 <b class="${(ssf.dealer || 0) >= 0 ? "up" : "down"}">${fmtKou(ssf.dealer || 0)}</b></span>
+    </div>
+    <div class="fssf-sub">未平倉前十大(大戶布局的個股)</div>
+    <table class="ssf-table"><tbody>${ssfRows || '<tr><td colspan="3">—</td></tr>'}</tbody></table>
+  </div>`;
+
+  box.innerHTML = intro + verdict + oiCards + vsBlock + pcBlock + ssfBlock +
+    `<div class="fut-note">📖 怎麼看:<b>外資台指期/前五大特定法人</b>淨多(紅/正)=大戶押漲、淨空(綠/負)=押跌;
+     <b>散戶多空比</b>是反指標(散戶越偏多越要小心);<b>P/C 未平倉比</b>偏高常代表低檔有撐;
+     <b>個股期貨未平倉</b>大的個股是大戶在期貨市場重押的標的。趨勢需逐日累積(目前 ${h.length} 日)。</div>` +
     footNote();
 }
 
