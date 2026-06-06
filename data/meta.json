@@ -1,12 +1,12 @@
 {
- "updated_at": "2026-06-05T00:10:50+08:00",
- "trading_date": "20260604",
+ "updated_at": "2026-06-06T11:59:36+08:00",
+ "trading_date": "20260605",
  "quarter_end": false,
  "universe": 120,
  "shown": 40,
  "market_split": {
-  "twse": 39,
-  "tpex": 1
+  "twse": 40,
+  "tpex": 0
  },
  "sources": {
   "twse": true,
@@ -16,60 +16,61 @@
   "overseas": true,
   "news": true,
   "history": true,
-  "tdcc": true
+  "tdcc": true,
+  "futures": true
  },
  "topic_momentum": {
-  "記憶體": 12.01,
-  "AI伺服器": 11.83,
-  "CoWoS先進封裝": 6.3,
-  "矽智財IP": 16.26,
-  "蘋果供應鏈": -0.56
+  "記憶體": -10.29,
+  "AI伺服器": -7.11,
+  "CoWoS先進封裝": 0.51,
+  "矽智財IP": -2.93,
+  "蘋果供應鏈": -1.51
  },
  "topic_heat": {
-  "記憶體": 7,
+  "記憶體": 14,
   "AI伺服器": 21,
-  "CoWoS先進封裝": 3,
-  "矽光子CPO": 5,
+  "CoWoS先進封裝": 4,
+  "矽光子CPO": 3,
   "散熱": 7,
-  "機器人": 13,
-  "重電綠能": 3,
-  "軍工航太": 2,
+  "機器人": 9,
+  "重電綠能": 2,
+  "軍工航太": 3,
   "PCB": 7,
   "矽智財IP": 0,
-  "被動元件": 6,
+  "被動元件": 4,
   "蘋果供應鏈": 1,
-  "低軌衛星": 8
+  "低軌衛星": 7
  },
- "yahoo_ok": 290,
+ "yahoo_ok": 299,
  "market_pulse": {
-  "advancers": 892,
-  "decliners": 1203,
-  "unchanged": 133,
-  "breadth_pct": 42.6,
-  "inst_foreign": -756.9,
-  "inst_trust": 41.7,
-  "inst_dealer": -213.7,
-  "inst_total": -928.9,
-  "margin_chg_lots": 24674.0,
-  "margin_up_count": 955,
+  "advancers": 742,
+  "decliners": 1344,
+  "unchanged": 146,
+  "breadth_pct": 35.6,
+  "inst_foreign": -826.3,
+  "inst_trust": 16.2,
+  "inst_dealer": -284.3,
+  "inst_total": -1094.4,
+  "margin_chg_lots": -119944.0,
+  "margin_up_count": 777,
   "hot_topics": [
    {
     "name": "AI伺服器",
     "heat": 21,
-    "mom": 11.8
-   },
-   {
-    "name": "記憶體",
-    "heat": 7,
-    "mom": 12.0
+    "mom": -7.1
    },
    {
     "name": "機器人",
-    "heat": 13,
+    "heat": 9,
+    "mom": 0
+   },
+   {
+    "name": "散熱",
+    "heat": 7,
     "mom": 0
    }
   ],
-  "mood": "neutral",
-  "mood_text": "中性"
+  "mood": "headwind",
+  "mood_text": "逆風"
  }
 }
