@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-06-06T12:39:22+08:00",
+ "updated_at": "2026-06-06T12:52:10+08:00",
  "trading_date": "20260605",
  "quarter_end": false,
  "universe": 120,
@@ -17,7 +17,7 @@
   "news": true,
   "history": true,
   "tdcc": true,
-  "futures": false
+  "futures": true
  },
  "topic_momentum": {
   "記憶體": -10.29,
@@ -28,10 +28,10 @@
  },
  "topic_heat": {
   "記憶體": 14,
-  "AI伺服器": 22,
+  "AI伺服器": 17,
   "CoWoS先進封裝": 3,
   "矽光子CPO": 3,
-  "散熱": 7,
+  "散熱": 5,
   "機器人": 9,
   "重電綠能": 2,
   "軍工航太": 3,
@@ -56,7 +56,7 @@
   "hot_topics": [
    {
     "name": "AI伺服器",
-    "heat": 22,
+    "heat": 17,
     "mom": -7.1
    },
    {
@@ -65,7 +65,7 @@
     "mom": 0
    },
    {
-    "name": "散熱",
+    "name": "PCB",
     "heat": 7,
     "mom": 0
    }
