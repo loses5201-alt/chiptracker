@@ -27,6 +27,7 @@ from .sources.inst_history import fetch_trend as fetch_inst_trend
 from .sources.stock_chip_history import fetch as fetch_stock_chips
 from .sources import tdcc_holders
 from .sources import insider_holdings
+from .sources import futures as futures_src
 from .notify import notify
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -103,6 +104,53 @@ def update_tdcc(holders: dict) -> dict:
             continue
         cur, prev = arr[-1], (arr[-2] if len(arr) >= 2 else None)
         out[code] = {"ratio": cur, "week_chg": round(cur - prev, 2) if prev is not None else None}
+    return out
+
+
+FUT_CAP = 20  # 保留近 20 交易日台指期籌碼(算趨勢/連續加減碼)
+
+
+def update_futures() -> dict:
+    """
+    台指期貨大盤多空風向(TAIFEX)— 三大法人台指期未平倉 + P/C 比 + 趨勢累積 + 白話判讀。
+    OpenAPI 只給最新一日 → 每日累積 data/futures.json(近 FUT_CAP 日)算外資連續加/減碼。
+    失敗回 {} 不影響主資料。
+    """
+    try:
+        f = futures_src.fetch()
+    except Exception as e:  # noqa: BLE001
+        print(f"  期貨籌碼失敗(略過):{e}")
+        return {}
+    path = DATA / "futures.json"
+    prev = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    hist = prev.get("history", [])
+    snap = {"date": f["date"], "foreign": f["tx"]["foreign"], "trust": f["tx"]["trust"],
+            "dealer": f["tx"]["dealer"], "pc_oi": f["pc"]["oi_ratio"]}
+    if not hist or hist[-1]["date"] != f["date"]:
+        hist.append(snap)
+        hist = hist[-FUT_CAP:]
+    # 外資台指期未平倉「連續加碼(正)/減碼(負)」天數
+    fs = [h["foreign"] for h in hist]
+    streak = 0
+    for i in range(len(fs) - 1, 0, -1):
+        d = fs[i] - fs[i - 1]
+        if d == 0:
+            break
+        s = 1 if d > 0 else -1
+        if streak == 0 or (s > 0) == (streak > 0):
+            streak = s * (abs(streak) + 1)
+        else:
+            break
+    # 白話判讀(保守、附說明,非投資建議)
+    fo = f["tx"]["foreign"]
+    if fo >= 10000:
+        verdict, vr = "偏多", f"外資台指期淨多單 {fo:,} 口(押大盤偏多)"
+    elif fo <= -10000:
+        verdict, vr = "偏空", f"外資台指期淨空單 {abs(fo):,} 口(押大盤偏空)"
+    else:
+        verdict, vr = "中性", f"外資台指期未平倉接近中性({fo:+,} 口)"
+    out = {**f, "history": hist, "foreign_streak": streak, "verdict": verdict, "verdict_reason": vr}
+    path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     return out
 
 
@@ -391,6 +439,11 @@ def main() -> int:
         print(f"  法人趨勢失敗(略過):{e}")
     inst_today = itrend[-1] if itrend else {}
 
+    # 台指期貨大盤多空風向(TAIFEX):三大法人台指期未平倉 + P/C 比 + 趨勢累積
+    fut = update_futures()
+    if fut:
+        print(f"  台指期:外資未平倉 {fut['tx']['foreign']:+,} 口 / P/C {fut['pc']['oi_ratio']} / 判讀 {fut['verdict']}")
+
     # 集保千張大戶持股(Phase B):大戶比例週升 + 股價沒漲 = 真吸籌(比 T86 法人更貼近主力)
     try:
         big_holders = update_tdcc(tdcc_holders.fetch())
@@ -413,7 +466,7 @@ def main() -> int:
             "twse": True, "tpex": bool(tp_q), "broker": broker.enabled,
             "fundamentals": bool(funds), "overseas": bool(ov_prices),
             "news": any(v["heat"] for v in heat.values()), "history": bool(yh),
-            "tdcc": bool(big_holders),
+            "tdcc": bool(big_holders), "futures": bool(fut),
         },
         "topic_momentum": topic_mom,
         "topic_heat": {n: d["heat"] for n, d in heat.items()},

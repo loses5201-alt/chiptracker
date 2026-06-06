@@ -445,6 +445,43 @@ body.dark .fc-name{color:#e8eaf0}
 body.dark .fc-ret.down{color:#4ade80}
 body.dark .fc-meta{color:#8b92a6}
 
+/* 期貨風向(台指期三大法人未平倉 + P/C) */
+.fut-intro{background:#eef2ff;border:1px solid #c7d2fe;border-radius:12px;padding:12px 16px;font-size:13px;color:#3730a3;margin-bottom:14px;line-height:1.6}
+.fut-verdict{display:flex;align-items:center;gap:14px;border-radius:14px;padding:16px 18px;margin-bottom:14px;border:1px solid}
+.fut-verdict.bull{background:linear-gradient(135deg,rgba(239,68,68,.08),rgba(239,68,68,.02));border-color:rgba(239,68,68,.25)}
+.fut-verdict.bear{background:linear-gradient(135deg,rgba(22,163,74,.08),rgba(22,163,74,.02));border-color:rgba(22,163,74,.25)}
+.fut-verdict.neutral{background:#f6f7f9;border-color:#e3e6ec}
+.fv-tag{font-size:26px;font-weight:800;letter-spacing:1px}
+.fut-verdict.bull .fv-tag{color:#ef4444}.fut-verdict.bear .fv-tag{color:#16a34a}.fut-verdict.neutral .fv-tag{color:#64748b}
+.fv-reason{font-size:14px;color:#3a4151;font-weight:500}
+.fut-oi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px}
+.fut-oi{background:#fff;border:1px solid #e8ebf1;border-radius:13px;padding:14px 16px;box-shadow:0 4px 14px rgba(20,30,60,.05)}
+.fo-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.fo-k{font-size:13px;font-weight:600;color:#475067}
+.fo-tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.fo-tag.up{background:rgba(239,68,68,.12);color:#ef4444}.fo-tag.down{background:rgba(22,163,74,.12);color:#16a34a}
+.fo-val{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.fo-val.up{color:#ef4444}.fo-val.down{color:#16a34a}
+.fo-foot{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.fut-day{font-size:11px;color:#6b7280}.fut-day.up{color:#ef4444}.fut-day.down{color:#16a34a}
+.fut-streak{font-size:11px;font-weight:700;padding:1px 7px;border-radius:12px}
+.fut-streak.up{background:rgba(239,68,68,.1);color:#dc2626}.fut-streak.down{background:rgba(22,163,74,.1);color:#15803d}
+.fut-pc{background:#fff;border:1px solid #e8ebf1;border-radius:13px;padding:6px 16px;margin-bottom:14px}
+.fpc-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f0f2f6}
+.fpc-row:last-child{border-bottom:none}
+.fpc-k{font-size:13px;color:#475067;flex:1}
+.fpc-v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.fpc-v.up{color:#ef4444}.fpc-v.down{color:#16a34a}
+.fpc-read{font-size:12px;color:#6b7280}
+.fut-note{background:#f8fafc;border-left:3px solid #818cf8;border-radius:8px;padding:11px 14px;font-size:12px;color:#475067;line-height:1.7}
+body.dark .fut-intro{background:rgba(99,102,241,.12);border-color:rgba(129,140,248,.3);color:#c7d2fe}
+body.dark .fut-verdict.neutral{background:#171a22;border-color:#2a2f3a}
+body.dark .fv-reason{color:#c2c8d4}
+body.dark .fut-oi,body.dark .fut-pc{background:#161922;border-color:#272c38}
+body.dark .fo-k,body.dark .fpc-k{color:#aeb6c6}
+body.dark .fpc-row{border-color:#23283340}
+body.dark .fut-note{background:#161922;color:#aeb6c6}
+
 /* 做空標的(綠系,台股綠跌) */
 .short-intro{background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;font-size:13px;color:#b45309;margin-bottom:16px;line-height:1.6}
 .card.short{border-color:rgba(16,185,129,.15)}

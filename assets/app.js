@@ -15,6 +15,7 @@ const STEALTH_TEXT = { strong: "強力潛伏", mid: "潛伏中", watch: "觀察"
 const TABS = [
   { k: "stealth", t: "主力潛伏" },
   { k: "entry", t: "進場建議" },
+  { k: "futures", t: "期貨風向" },
   { k: "foreign", t: "法人動向" },
   { k: "fund", t: "基本面" },
   { k: "topic", t: "題材熱度" },
@@ -37,6 +38,7 @@ let SHORTS = null;
 let STEALTH = null;
 let STEALTH_BT = null;
 let STEALTH_WATCH = null;
+let FUTURES = null;
 let view = "stealth";
 
 async function boot() {
@@ -58,6 +60,7 @@ async function boot() {
     STEALTH = await fetch("data/stealth.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     STEALTH_BT = await fetch("data/stealth_backtest.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
     STEALTH_WATCH = await fetch("data/stealth_watch.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
+    FUTURES = await fetch("data/futures.json?_=" + Date.now()).then((r) => r.json()).catch(() => null);
   } catch (e) {
     document.getElementById("content").innerHTML =
       '<div class="empty">尚無資料。請先讓 GitHub Actions 跑過一次,或本機執行 <code>python -m fetcher.build</code></div>';
@@ -81,7 +84,7 @@ function renderMeta() {
     `<span class="meta-main">候選 <b>${META.universe || 0}</b> 檔 · 交易日 <b>${META.trading_date || "—"}</b>${split}</span>` +
     `<span class="meta-src">` +
     chip(s.tpex, "上櫃") + chip(s.history, "技術") + chip(s.fundamentals, "基本面") +
-    chip(s.overseas, "國際") + chip(s.news, "新聞") + chip(s.tdcc, "大戶") + chip(s.broker, "分點") +
+    chip(s.overseas, "國際") + chip(s.news, "新聞") + chip(s.tdcc, "大戶") + chip(s.futures, "期貨") + chip(s.broker, "分點") +
     `</span><span class="meta-upd">更新 ${upd}</span>`;
 }
 
@@ -101,6 +104,7 @@ function render() {
   if (view === "topic") return renderTopic(box);
   if (view === "backtest") return renderBacktest(box);
   if (view === "stealth") return renderStealth(box);
+  if (view === "futures") return renderFutures(box);
   if (view === "short") return renderShorts(box);
   if (view === "watch") return renderWatchlist(box);
   let list = [...STOCKS];
@@ -759,6 +763,65 @@ function marketPulse() {
       ${META.quarter_end ? `<div class="pulse-qe">📅 季底投信作帳期 — 留意投信連買的中型股</div>` : ""}
     </div>
   </div>`;
+}
+
+// ── 期貨風向(台指期三大法人未平倉 + P/C 比)──
+function fmtKou(n) {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  return sign + Math.abs(n).toLocaleString() + " 口";
+}
+
+function futOiCard(label, val, day, series) {
+  const dir = val > 0 ? "多" : val < 0 ? "空" : "—";
+  const cls = val > 0 ? "up" : val < 0 ? "down" : "";
+  const st = streak(series);
+  const stTxt = st && st.n >= 2
+    ? `<span class="fut-streak ${st.dir > 0 ? "up" : "down"}">連續淨${st.dir > 0 ? "多" : "空"}${st.n}日</span>` : "";
+  const dayTxt = day != null ? `<span class="fut-day ${day >= 0 ? "up" : "down"}">當日 ${day >= 0 ? "+" : "−"}${Math.abs(day).toLocaleString()}</span>` : "";
+  return `<div class="fut-oi">
+    <div class="fo-head"><span class="fo-k">${label}</span><span class="fo-tag ${cls}">淨${dir}單</span></div>
+    <div class="fo-val ${cls}">${fmtKou(val)}</div>
+    <div class="fo-foot">${series.length >= 2 ? miniSpark(series, 70, 22) : ""}${dayTxt}${stTxt}</div>
+  </div>`;
+}
+
+function renderFutures(box) {
+  const f = FUTURES;
+  if (!f || !f.tx) {
+    box.innerHTML = '<div class="empty" style="padding:50px">期貨資料尚未產生(下次自動更新後出現)</div>' + footNote();
+    return;
+  }
+  const h = f.history || [];
+  const moodCls = f.verdict === "偏多" ? "bull" : f.verdict === "偏空" ? "bear" : "neutral";
+  // P/C 未平倉比判讀:偏高(>120)=避險買權多、籌碼偏多支撐;偏低(<80)=樂觀過頭偏空
+  const pc = f.pc.oi_ratio;
+  const pcRead = pc >= 120 ? "偏多(避險 Put 多、低點有撐)" : pc <= 80 ? "偏空(樂觀過頭)" : "中性";
+  const pcCls = pc >= 120 ? "up" : pc <= 80 ? "down" : "";
+
+  const intro = `<div class="fut-intro"><b>📊 期貨風向(大盤多空)</b> — 個股籌碼看「誰買哪檔」,期貨籌碼看「大戶對整個大盤的押注」。<b>外資台指期未平倉</b>是台股最重要的多空風向球;搭配個股潛伏/做空一起看。資料日 ${f.date}。程式訊號、非投資建議。</div>`;
+
+  const verdict = `<div class="fut-verdict ${moodCls}">
+    <div class="fv-tag">${f.verdict}</div>
+    <div class="fv-reason">${f.verdict_reason}</div>
+  </div>`;
+
+  const oiCards = `<div class="fut-oi-grid">
+    ${futOiCard("外資台指期", f.tx.foreign, f.tx.foreign_day, h.map((x) => x.foreign))}
+    ${futOiCard("投信台指期", f.tx.trust, f.tx.trust_day, h.map((x) => x.trust))}
+    ${futOiCard("自營台指期", f.tx.dealer, f.tx.dealer_day, h.map((x) => x.dealer))}
+  </div>`;
+
+  const pcBlock = `<div class="fut-pc">
+    <div class="fpc-row"><span class="fpc-k">選擇權 Put/Call 未平倉比</span>
+      <b class="fpc-v ${pcCls}">${pc}%</b><span class="fpc-read">${pcRead}</span>
+      ${h.length >= 2 ? miniSpark(h.map((x) => x.pc_oi), 80, 22) : ""}</div>
+    <div class="fpc-row"><span class="fpc-k">成交量 P/C 比</span><b class="fpc-v">${f.pc.vol_ratio}%</b></div>
+  </div>`;
+
+  box.innerHTML = intro + verdict + oiCards + pcBlock +
+    `<div class="fut-note">📖 怎麼看:外資台指期<b>淨多單(綠/正)</b>=大戶押大盤漲、<b>淨空單(紅/負)</b>=押跌;
+     看「連續加/減碼」比看單日更準。P/C 未平倉比偏高常代表低檔有避險買盤支撐。趨勢需逐日累積(目前 ${h.length} 日)。</div>` +
+    footNote();
 }
 
 // 載入骨架(資料抓取期間的佔位,取代純文字「載入中」)
