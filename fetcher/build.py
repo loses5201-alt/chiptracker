@@ -126,7 +126,7 @@ def update_futures() -> dict:
     hist = prev.get("history", [])
     snap = {"date": f["date"], "foreign": f["tx"]["foreign"], "trust": f["tx"]["trust"],
             "dealer": f["tx"]["dealer"], "pc_oi": f["pc"]["oi_ratio"],
-            "retail": f.get("retail", {}).get("ratio"), "big5": f.get("big5", {}).get("tx_net")}
+            "retail": (f.get("retail") or {}).get("ratio"), "big5": (f.get("big5") or {}).get("tx_net")}
     if not hist or hist[-1]["date"] != f["date"]:
         hist.append(snap)
         hist = hist[-FUT_CAP:]

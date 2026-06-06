@@ -54,11 +54,24 @@ def _get(path: str, tries: int = 4):
         try:
             req = urllib.request.Request(BASE + path, headers=HEADERS)
             with urllib.request.urlopen(req, timeout=45) as r:
-                return json.loads(r.read().decode("utf-8"))
+                body = r.read().decode("utf-8").strip()
+            if not body:
+                raise ValueError("空回應(暫時性,退避重試)")
+            return json.loads(body)
         except Exception as e:  # noqa: BLE001 — 退避重試
             last = str(e)
-            time.sleep(1.5 * (i + 1))
+            time.sleep(2 * (i + 1))
     raise RuntimeError(f"TAIFEX {path} 連 {tries} 次失敗:{last}")
+
+
+def _safe(path: str, default):
+    """單一端點容錯:失敗回 default,不讓一個端點拖垮整個期貨功能(validate 架構教訓)。"""
+    try:
+        time.sleep(0.4)   # 端點間小延遲,對 TAIFEX 友善、降限流機率
+        return _get(path)
+    except Exception as e:  # noqa: BLE001
+        print(f"  ⚠ TAIFEX {path} 取用失敗(該區塊略過):{e}")
+        return default
 
 
 def _inst_net(rows: list, contract_name: str) -> dict:
@@ -80,7 +93,10 @@ def fetch() -> dict:
       big5   前五大特定法人台指期淨部位(大額交易人)— 外資主力多空
       ssf    法人個股期貨整體淨 + 個股期貨未平倉前十大(含股名)
     """
-    rows = _get("/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate")
+    # 主資料:三大法人各期貨契約(失敗則整個期貨無資料,回 {} 由上層略過)
+    rows = _safe("/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate", None)
+    if not rows:
+        raise RuntimeError("三大法人期貨主資料取用失敗")
     tx = {r.get("Item"): r for r in rows if r.get("ContractCode") == TX}
     date = next((r.get("Date") for r in rows if r.get("ContractCode") == TX), "")
 
@@ -90,26 +106,34 @@ def fetch() -> dict:
     def net_day(item: str) -> int:
         return _num((tx.get(item) or {}).get("TradingVolume(Net)"))
 
-    pc_rows = _get("/PutCallRatio")
-    pc = pc_rows[0] if pc_rows else {}
+    # 以下各區塊「各自容錯」:任一端點掛掉,該區塊回 None/空,其餘照常產出(不讓單點拖垮整體)
+    # P/C 比
+    pc_rows = _safe("/PutCallRatio", None)
+    pc = (pc_rows[0] if pc_rows else {}) or {}
+    pc_oi = _fnum(pc.get("PutCallOIRatio%")) if pc else None
+    pc_vol = _fnum(pc.get("PutCallVolumeRatio%")) if pc else None
+
+    # 每日期貨行情(供小台總OI、個股期貨OI),共用一次
+    fut_report = _safe("/DailyMarketReportFut", []) or []
 
     # 散戶多空比(小台):散戶淨 ≈ -法人淨;比 = -法人小台淨 / 小台總未平倉 × 100。正=散戶偏多(反指偏空)
     mtx_inst = _inst_net(rows, MTX_NAME)
     mtx_inst_net = mtx_inst["foreign"] + mtx_inst["trust"] + mtx_inst["dealer"]
-    fut_report = _get("/DailyMarketReportFut")
     mtx_oi = sum(_num(r.get("OpenInterest")) for r in fut_report if r.get("Contract") == MTX_CODE)
-    retail_ratio = round(-mtx_inst_net / mtx_oi * 100, 1) if mtx_oi else 0.0
+    retail = {"ratio": round(-mtx_inst_net / mtx_oi * 100, 1), "mtx_oi": mtx_oi,
+              "inst_net": mtx_inst_net} if mtx_oi else None
 
     # 前五大特定法人台指期淨(大額交易人:TX、全月份合計 999912、特定法人 TypeOfTraders=1)
-    lt = _get("/OpenInterestOfLargeTradersFutures")
+    lt = _safe("/OpenInterestOfLargeTradersFutures", []) or []
     b5 = next((r for r in lt if r.get("Contract") == "TX"
-               and r.get("SettlementMonth") == "999912" and r.get("TypeOfTraders") == "1"), {})
-    big5_net = _num(b5.get("Top5Buy")) - _num(b5.get("Top5Sell"))
+               and r.get("SettlementMonth") == "999912" and r.get("TypeOfTraders") == "1"), None)
+    big5 = {"tx_net": _num(b5.get("Top5Buy")) - _num(b5.get("Top5Sell")),
+            "market_oi": _num(b5.get("OIOfMarket"))} if b5 else None
 
-    # 法人個股期貨整體淨 + 個股期貨未平倉前十大(DailyMarketReportFut OI 依契約加總 + SSFLists 對股名)
+    # 法人個股期貨整體淨 + 個股期貨未平倉前十大(DailyMarketReportFut OI 依股票代號加總 + SSFLists 對股名)
     ssf_net = _inst_net(rows, SSF_NAME)
-    ssf_map = {r.get("Contract"): r for r in _get("/SSFLists")}
-    # 依「股票代號」加總(同一檔可能有大型/小型多個期貨契約 → 合併,避免同股重複出現)
+    ssf_list = _safe("/SSFLists", []) or []
+    ssf_map = {r.get("Contract"): r for r in ssf_list}
     by_stock: dict[str, dict] = {}
     for r in fut_report:
         m = ssf_map.get(r.get("Contract"))
@@ -126,12 +150,9 @@ def fetch() -> dict:
             "foreign": net_oi(_FOREIGN), "trust": net_oi(_TRUST), "dealer": net_oi(_DEALER),
             "foreign_day": net_day(_FOREIGN), "trust_day": net_day(_TRUST), "dealer_day": net_day(_DEALER),
         },
-        "pc": {
-            "oi_ratio": _fnum(pc.get("PutCallOIRatio%")),
-            "vol_ratio": _fnum(pc.get("PutCallVolumeRatio%")),
-        },
-        "retail": {"ratio": retail_ratio, "mtx_oi": mtx_oi, "inst_net": mtx_inst_net},
-        "big5": {"tx_net": big5_net, "market_oi": _num(b5.get("OIOfMarket"))},
+        "pc": {"oi_ratio": pc_oi, "vol_ratio": pc_vol},
+        "retail": retail,
+        "big5": big5,
         "ssf": {"foreign": ssf_net["foreign"], "trust": ssf_net["trust"], "dealer": ssf_net["dealer"],
                 "top": ssf_top},
     }

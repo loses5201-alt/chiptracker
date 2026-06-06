@@ -822,17 +822,17 @@ function renderFutures(box) {
     return;
   }
   const h = f.history || [];
-  const pc = f.pc.oi_ratio;
-  const retail = f.retail || {}, big5 = f.big5 || {}, ssf = f.ssf || {};
-  const rRatio = retail.ratio, b5net = big5.tx_net;
+  const pc = f.pc ? f.pc.oi_ratio : null;        // 各面向可能因端點暫缺為 null,互不影響
+  const retail = f.retail || null, big5 = f.big5 || null, ssf = f.ssf || {};
+  const rRatio = retail ? retail.ratio : null, b5net = big5 ? big5.tx_net : null;
 
-  // 綜合多空訊號分析:把各面向轉成「多/空」票,統計傾向(這是期貨頁的核心分析)
+  // 綜合多空訊號分析:各面向轉「多/空」票統計傾向。缺資料的面向不投票(null 不當 0,避免誤判)
   const sig = [];
   const add = (cond, side, txt) => { if (cond) sig.push({ side, txt }); };
   add(f.tx.foreign > 10000, "多", "外資台指期淨多單"); add(f.tx.foreign < -10000, "空", "外資台指期淨空單");
-  add(b5net > 3000, "多", "前五大特定法人偏多"); add(b5net < -3000, "空", "前五大特定法人偏空");
-  add(rRatio > 15, "空", "散戶偏多(反指標)"); add(rRatio < -15, "多", "散戶偏空(反指標)");
-  add(pc >= 120, "多", "P/C比偏高(低檔有撐)"); add(pc <= 80, "空", "P/C比偏低(過度樂觀)");
+  add(b5net != null && b5net > 3000, "多", "前五大特定法人偏多"); add(b5net != null && b5net < -3000, "空", "前五大特定法人偏空");
+  add(rRatio != null && rRatio > 15, "空", "散戶偏多(反指標)"); add(rRatio != null && rRatio < -15, "多", "散戶偏空(反指標)");
+  add(pc != null && pc >= 120, "多", "P/C比偏高(低檔有撐)"); add(pc != null && pc <= 80, "空", "P/C比偏低(過度樂觀)");
   const bull = sig.filter((s) => s.side === "多").length, bear = sig.filter((s) => s.side === "空").length;
   const compCls = bull > bear ? "bull" : bear > bull ? "bear" : "neutral";
   const compTag = bull > bear ? "偏多" : bear > bull ? "偏空" : "中性";
@@ -853,32 +853,32 @@ function renderFutures(box) {
     ${futOiCard("自營台指期", f.tx.dealer, f.tx.dealer_day, h.map((x) => x.dealer))}
   </div>`;
 
-  // 大戶 vs 散戶
-  const b5Read = b5net > 3000 ? "押多" : b5net < -3000 ? "押空" : "中性";
-  const rRead = rRatio > 15 ? "散戶偏多 → 反指偏空" : rRatio < -15 ? "散戶偏空 → 反指偏多" : "散戶中性";
+  // 大戶 vs 散戶(缺資料的卡片顯示「資料暫缺」,不影響另一張)
+  const b5Read = b5net == null ? "資料暫缺" : b5net > 3000 ? "押多" : b5net < -3000 ? "押空" : "中性";
+  const rRead = rRatio == null ? "資料暫缺" : rRatio > 15 ? "散戶偏多 → 反指偏空" : rRatio < -15 ? "散戶偏空 → 反指偏多" : "散戶中性";
+  const b5Spark = miniSpark(h.map((x) => x.big5).filter((v) => v != null), 90, 22);
+  const rSpark = miniSpark(h.map((x) => x.retail).filter((v) => v != null), 90, 22);
   const vsBlock = `<div class="fut-sec-t">大戶 vs 散戶</div><div class="fut-vs">
     <div class="fvs-card">
       <div class="fvs-k">前五大特定法人 · 台指期淨(外資主力)</div>
-      <div class="fvs-v ${b5net >= 0 ? "up" : "down"}">${fmtKou(b5net)}</div>
-      <div class="fvs-read">${b5Read}${h.length >= 2 ? "" : ""}</div>
-      ${h.length >= 2 ? miniSpark(h.map((x) => x.big5).filter((v) => v != null), 90, 22) : ""}
+      <div class="fvs-v ${(b5net || 0) >= 0 ? "up" : "down"}">${b5net == null ? "—" : fmtKou(b5net)}</div>
+      <div class="fvs-read">${b5Read}</div>${b5Spark}
     </div>
     <div class="fvs-card">
       <div class="fvs-k">散戶多空比(小台,反指標)</div>
-      <div class="fvs-v ${rRatio >= 0 ? "up" : "down"}">${rRatio >= 0 ? "+" : ""}${rRatio}%</div>
-      <div class="fvs-read">${rRead}</div>
-      ${h.length >= 2 ? miniSpark(h.map((x) => x.retail).filter((v) => v != null), 90, 22) : ""}
+      <div class="fvs-v ${(rRatio || 0) >= 0 ? "up" : "down"}">${rRatio == null ? "—" : (rRatio >= 0 ? "+" : "") + rRatio + "%"}</div>
+      <div class="fvs-read">${rRead}</div>${rSpark}
     </div>
   </div>`;
 
-  // 選擇權 P/C
-  const pcRead = pc >= 120 ? "偏多(避險 Put 多、低點有撐)" : pc <= 80 ? "偏空(樂觀過頭)" : "中性";
-  const pcCls = pc >= 120 ? "up" : pc <= 80 ? "down" : "";
+  // 選擇權 P/C(缺資料顯示 —)
+  const pcRead = pc == null ? "資料暫缺" : pc >= 120 ? "偏多(避險 Put 多、低點有撐)" : pc <= 80 ? "偏空(樂觀過頭)" : "中性";
+  const pcCls = pc == null ? "" : pc >= 120 ? "up" : pc <= 80 ? "down" : "";
+  const pcSpark = miniSpark(h.map((x) => x.pc_oi).filter((v) => v != null), 80, 22);
   const pcBlock = `<div class="fut-sec-t">選擇權情緒</div><div class="fut-pc">
     <div class="fpc-row"><span class="fpc-k">Put/Call 未平倉比</span>
-      <b class="fpc-v ${pcCls}">${pc}%</b><span class="fpc-read">${pcRead}</span>
-      ${h.length >= 2 ? miniSpark(h.map((x) => x.pc_oi), 80, 22) : ""}</div>
-    <div class="fpc-row"><span class="fpc-k">成交量 P/C 比</span><b class="fpc-v">${f.pc.vol_ratio}%</b></div>
+      <b class="fpc-v ${pcCls}">${pc == null ? "—" : pc + "%"}</b><span class="fpc-read">${pcRead}</span>${pcSpark}</div>
+    <div class="fpc-row"><span class="fpc-k">成交量 P/C 比</span><b class="fpc-v">${f.pc && f.pc.vol_ratio != null ? f.pc.vol_ratio + "%" : "—"}</b></div>
   </div>`;
 
   // 個股期貨
