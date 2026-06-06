@@ -112,11 +112,38 @@ function render() {
   if (view === "fund") list = list.filter((s) => s.yoy != null).sort((a, b) => b.s3 - a.s3);
   if (view === "intl") list = list.filter((s) => s.topic && s.topic !== "—").sort((a, b) => b.s4 - a.s4);
   if (!list.length) { box.innerHTML = '<div class="empty">此分頁暫無符合資料</div>' + footNote(); return; }
-  const pulse = view === "entry" ? marketPulse() : "";
-  box.innerHTML = pulse + `<div class="grid">${list.map((s, i) => card(s, i)).join("")}</div>` + footNote();
+  const head = view === "entry" ? marketPulse() : listAnalysis(view, list);
+  box.innerHTML = head + `<div class="grid">${list.map((s, i) => card(s, i)).join("")}</div>` + footNote();
   box.querySelectorAll(".card").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
   );
+}
+
+// 各分頁分析摘要(法人/基本面/國際)— 把卡片清單彙總成一句白話判讀
+function listAnalysis(view, list) {
+  if (!list || !list.length) return "";
+  const avg = (arr, k) => arr.reduce((a, s) => a + (s[k] || 0), 0) / arr.length;
+  let title = "", body = "";
+  if (view === "foreign") {
+    const sameBuy = list.filter((s) => s.align === "外資投信同買").length;
+    const top = list[0];
+    const conc = avg(list.slice(0, 40), "conc").toFixed(1);
+    title = "法人動向分析";
+    body = `今日 <b class="up">${sameBuy}</b> 檔<b>外資投信同買</b>(法人共識最強訊號)。法人吃貨最猛 <b>${top.n}</b> <span class="la-c">${top.c}</span>(法人分 ${top.s1});推薦股法人買超佔成交量平均 <b>${conc}%</b>。跟著外資投信同買、且佔比高的標的,是貼著法人布局的核心。`;
+  } else if (view === "fund") {
+    const hi = list.filter((s) => s.yoy >= 30).length;
+    const top = [...list].sort((a, b) => (b.yoy ?? -999) - (a.yoy ?? -999))[0];
+    title = "基本面分析";
+    body = `有營收資料的 <b>${list.length}</b> 檔中,<b class="up">${hi}</b> 檔月營收年增 ≥30%(高成長股)。成長最猛 <b>${top.n}</b> <span class="la-c">${top.c}</span>(YoY <b class="up">+${top.yoy}%</b>);全體平均 YoY <b>${avg(list, "yoy").toFixed(0)}%</b>。月營收年增是基本面動能的領先指標。`;
+  } else if (view === "intl") {
+    const by = {};
+    list.forEach((s) => { (by[s.topic] = by[s.topic] || []).push(s); });
+    const ranked = Object.entries(by).map(([t, arr]) => [t, avg(arr, "ov"), arr.length]).sort((a, b) => b[1] - a[1]);
+    const t0 = ranked[0];
+    title = "國際連動分析";
+    body = `關聯國際題材的 <b>${list.length}</b> 檔分布在 <b>${ranked.length}</b> 個題材。海外同業動能最強題材 <b class="up">${t0[0]}</b>(海外近5日均 ${t0[1] >= 0 ? "+" : ""}${t0[1].toFixed(1)}%、${t0[2]} 檔)。海外同業走強常領先台股同題材個股,題材輪動看這裡。`;
+  } else return "";
+  return `<div class="list-analysis"><div class="la-t">📊 ${title}</div><div class="la-b">${body}</div></div>`;
 }
 
 // ── 六面向雷達圖(純 SVG,無外部相依)──
@@ -408,7 +435,10 @@ function renderTopic(box) {
       <div class="topic-chips">${chips || '<span class="no-stock">候選股中無此題材</span>'}</div>
     </div>`;
   }).join("");
-  box.innerHTML = `<div class="topic-wrap">${bars}</div>` + footNote();
+  const totalNews = ranked.reduce((a, r) => a + r[1], 0);
+  const hot = ranked[0];
+  const analysis = hot ? `<div class="list-analysis"><div class="la-t">📊 題材熱度分析</div><div class="la-b">今日最熱題材 <b class="up">${hot[0]}</b>(🔥 ${hot[1]} 則新聞、推薦股 ${STOCKS.filter((s) => s.topic === hot[0]).length} 檔),全題材近 3 日共 <b>${totalNews}</b> 則新聞。題材熱度高=市場資金正聚焦,但<b>追題材要搭配法人買超</b>,別追在熱度退燒的題材尾聲。</div></div>` : "";
+  box.innerHTML = analysis + `<div class="topic-wrap">${bars}</div>` + footNote();
   box.querySelectorAll(".t-chip").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
   );
@@ -1030,7 +1060,13 @@ function renderShorts(box) {
     return;
   }
   const intro = `<div class="short-intro"><b>⚠️ 做空訊號(高檔回落 / 業績轉弱)</b> — 做空風險高(軋空、損失無上限),此為程式訊號、非投資建議,務必嚴設停損。</div>`;
-  box.innerHTML = intro + `<div class="grid">${SHORTS.map((s, i) => shortCard(s, i)).join("")}</div>` + footNote();
+  const strong = SHORTS.filter((s) => s.rec === "strong").length;
+  const hiPledge = SHORTS.filter((s) => (s.pledge || 0) >= 40).length;
+  const rc = {};
+  SHORTS.forEach((s) => (s.reason || []).forEach((r) => { rc[r] = (rc[r] || 0) + 1; }));
+  const topR = Object.entries(rc).sort((a, b) => b[1] - a[1])[0];
+  const analysis = `<div class="list-analysis short"><div class="la-t">📊 做空標的分析</div><div class="la-b">今日 <b>${SHORTS.length}</b> 檔做空訊號,其中 <b class="down">${strong}</b> 檔強訊號${hiPledge ? `、<b>${hiPledge}</b> 檔董監設質≥40%(股價跌易斷頭追繳、助跌)` : ""}。最常見做空理由:<b>${topR ? topR[0] : "—"}</b>。做空優先挑「漲多+營收沒跟上+法人出貨」三者俱全的,風險高務必停損。</div></div>`;
+  box.innerHTML = intro + analysis + `<div class="grid">${SHORTS.map((s, i) => shortCard(s, i)).join("")}</div>` + footNote();
   box.querySelectorAll(".card").forEach((el) =>
     el.addEventListener("click", () => openShortDetail(el.dataset.code)));
 }
