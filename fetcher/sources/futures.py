@@ -64,10 +64,14 @@ def _get(path: str, tries: int = 4):
     raise RuntimeError(f"TAIFEX {path} 連 {tries} 次失敗:{last}")
 
 
-def _safe(path: str, default):
-    """單一端點容錯:失敗回 default,不讓一個端點拖垮整個期貨功能(validate 架構教訓)。"""
+def _safe(path: str, default, gap: float = 3.0):
+    """
+    單一端點容錯:失敗回 default,不讓一個端點拖垮整個期貨功能(validate 架構教訓)。
+    端點間留 gap 秒延遲 —— TAIFEX 對短時間內密集請求會限流(實測美國 runner 連打 5 端點,
+    第一個成功、後續回空);拉開間隔大幅降低被擋機率。
+    """
     try:
-        time.sleep(0.4)   # 端點間小延遲,對 TAIFEX 友善、降限流機率
+        time.sleep(gap)
         return _get(path)
     except Exception as e:  # noqa: BLE001
         print(f"  ⚠ TAIFEX {path} 取用失敗(該區塊略過):{e}")
@@ -94,7 +98,7 @@ def fetch() -> dict:
       ssf    法人個股期貨整體淨 + 個股期貨未平倉前十大(含股名)
     """
     # 主資料:三大法人各期貨契約(失敗則整個期貨無資料,回 {} 由上層略過)
-    rows = _safe("/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate", None)
+    rows = _safe("/MarketDataOfMajorInstitutionalTradersDetailsOfFuturesContractsBytheDate", None, gap=0)
     if not rows:
         raise RuntimeError("三大法人期貨主資料取用失敗")
     tx = {r.get("Item"): r for r in rows if r.get("ContractCode") == TX}
