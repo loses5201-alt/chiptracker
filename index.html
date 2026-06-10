@@ -2,11 +2,18 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>跟著大戶賺大錢 — 台股籌碼進場看板</title>
+<meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="籌碼追蹤">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20260606e">
+<link rel="stylesheet" href="assets/style.css?v=20260610a">
 </head>
 <body>
 <script>if(localStorage.getItem('ct-theme')==='dark')document.body.classList.add('dark');</script>
@@ -29,7 +36,19 @@
   <div class="meta-line" id="meta">載入中…</div>
   <div id="content"><div class="empty">載入中…</div></div>
 </main>
+<nav class="bottombar" id="bottombar"></nav>
+<div class="sheet" id="more-sheet"><div class="sheet-card" id="more-body"></div></div>
 <div class="modal" id="modal"><div class="modal-card" id="modal-body"></div></div>
-<script src="assets/app.js?v=20260606e"></script>
+<!-- 前端按功能拆檔(維持全域函式,免打包器);99-boot 必須最後 -->
+<script src="assets/js/01-core.js?v=20260610a"></script>
+<script src="assets/js/02-components.js?v=20260610a"></script>
+<script src="assets/js/03-views.js?v=20260610a"></script>
+<script src="assets/js/04-futures.js?v=20260610a"></script>
+<script src="assets/js/05-stealth-short-watch.js?v=20260610a"></script>
+<script src="assets/js/99-boot.js?v=20260610a"></script>
+<script>
+// PWA:註冊 service worker(離線可看最後一次資料;手機可「加入主畫面」當 App 用)
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
 </body>
 </html>
