@@ -94,6 +94,51 @@ def _post(webhook: str, payload: dict) -> int:
         return r.status
 
 
+# 預期每日該到位的資料源(broker 目前無免費來源、長期 False,不列入告警)
+EXPECTED_SOURCES = {
+    "twse": "上市行情", "tpex": "上櫃行情", "fundamentals": "月營收",
+    "overseas": "海外同業", "news": "題材新聞", "history": "技術面歷史",
+    "tdcc": "集保大戶", "futures": "期貨籌碼",
+}
+
+
+def notify_health(sources: dict, trading_date: str) -> str:
+    """
+    資料源健康告警:某來源掛掉時推 Discord,不再默默變 null(前端只會看到「—」,
+    沒人發現壞了)。同一交易日 + 同一組故障只推一次,修好或惡化才會再推。
+    """
+    webhook = os.environ.get("DISCORD_WEBHOOK", "").strip()
+    if not webhook:
+        return "略過(未設 DISCORD_WEBHOOK)"
+    failed = sorted(k for k in EXPECTED_SOURCES if not sources.get(k))
+    if not failed:
+        return "資料源全數正常"
+    state_f = DATA / "notify_state.json"
+    state = json.loads(state_f.read_text(encoding="utf-8")) if state_f.exists() else {}
+    last = state.get("last_health", {})
+    if last.get("date") == trading_date and last.get("failed") == failed:
+        return f"略過(今日已告警:{','.join(failed)})"
+    names = "、".join(EXPECTED_SOURCES[k] for k in failed)
+    payload = {
+        "username": "ChipTracker",
+        "embeds": [{
+            "title": f"⚠️ 資料源異常 · {_fmt_date(trading_date)}",
+            "url": SITE,
+            "color": 0xF97316,
+            "description": f"今日 build 有 **{len(failed)}** 個資料源沒抓到:**{names}**。\n"
+                           f"對應評分以中性值退讓,排名可信度下降;連續多日異常請查 API 端點或限流。",
+            "footer": {"text": "來源:GitHub Actions 每日 build 健檢"},
+        }],
+    }
+    try:
+        code = _post(webhook, payload)
+        state["last_health"] = {"date": trading_date, "failed": failed}
+        state_f.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        return f"已告警(HTTP {code}):{names}"
+    except Exception as e:  # noqa: BLE001 — 告警失敗不該影響 build
+        return f"告警失敗(略過):{e}"
+
+
 def notify(stealth: list, watch: dict, trading_date: str) -> str:
     """讀 DISCORD_WEBHOOK 推播;無金鑰或當日已推則略過。回傳狀態字串供 log。"""
     webhook = os.environ.get("DISCORD_WEBHOOK", "").strip()
@@ -105,7 +150,8 @@ def notify(stealth: list, watch: dict, trading_date: str) -> str:
         return "略過(今日已推播)"
     try:
         code = _post(webhook, build_payload(stealth, watch, trading_date))
-        state_f.write_text(json.dumps({"last_pushed": trading_date}, ensure_ascii=False), encoding="utf-8")
+        state["last_pushed"] = trading_date   # 合併寫回,別蓋掉健康告警的去重狀態
+        state_f.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
         return f"推播成功(HTTP {code})"
     except Exception as e:  # noqa: BLE001 — 推播失敗不該影響 build
         return f"推播失敗(略過):{e}"

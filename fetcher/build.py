@@ -28,7 +28,7 @@ from .sources.stock_chip_history import fetch as fetch_stock_chips
 from .sources import tdcc_holders
 from .sources import insider_holdings
 from .sources import futures as futures_src
-from .notify import notify
+from .notify import notify, notify_health
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -475,6 +475,8 @@ def main() -> int:
         "market_pulse": market_pulse.compute(quotes, margin, heat, topic_mom, inst_today),
     }
     (DATA / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+    # 資料源健檢告警:有來源掛掉就推 Discord(不再默默變 null 沒人發現)
+    print(f"  資料源健檢:{notify_health(meta['sources'], trading_date)}")
 
     # 大盤趨勢檔(融資 + 三大法人),供溫度計畫週趨勢
     (DATA / "market_trend.json").write_text(

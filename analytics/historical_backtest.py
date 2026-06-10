@@ -472,11 +472,11 @@ def _write(result: dict) -> dict:
 
 if __name__ == "__main__":
     import sys
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # 終端 cp950 印不出 ≥/α(兩條路徑都要)
+    except Exception:  # noqa: BLE001
+        pass
     if "--stealth" in sys.argv:
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # 終端 cp950 印不出 ≥/α
-        except Exception:  # noqa: BLE001
-            pass
         # 大型股池(offset=0)對潛伏不公平;預設用中型股池,加 --large 才測大型對比
         off = 0 if "--large" in sys.argv else STEALTH_OFFSET
         uni = _universe(UNIVERSE_N, offset=off)

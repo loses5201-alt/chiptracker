@@ -12,16 +12,22 @@
 設計原則:每項獨立、各有上限,缺資料退讓給中性值,不讓單一缺漏拖垮整體。
 """
 from __future__ import annotations
+import math
+
 from . import indicators as ind
 
 
-def score_institutional(inst: dict, volume_shares: float) -> tuple[int, str | None]:
+def score_institutional(inst: dict, volume_shares: float) -> tuple[float, str | None]:
     """s1:法人籌碼(0-22)。三大法人合計買超佔當日成交量比重。"""
     if not inst or volume_shares <= 0:
         return 0, None
     total = inst.get("total", 0.0)
     ratio = total / volume_shares
-    s = max(0, min(22, round(11 + ratio * 240)))
+    # tanh 壓縮取代線性:原 ratio*240 在買超佔量 4.6% 即頂滿 → 入選股人人 22 分
+    # (weight_review 實測 discrim=0,最重因子完全沒在排名)。改後 3%→16、6%→19、
+    # 12%→21.6,極端才貼近滿分,排名拉得開;賣超側對稱遞減。
+    s = round(11 + 11 * math.tanh(ratio / 0.06), 1)
+    s = max(0.0, min(22.0, s))
     note = None
     if inst.get("foreign", 0) > 0 and inst.get("trust", 0) > 0:
         note = "外資投信同買"
@@ -65,12 +71,16 @@ def score_margin_short(mg: dict, inst: dict) -> tuple[int, str | None]:
     return max(0, min(8, s)), ("、".join(notes) or None)
 
 
-def score_fundamental(fund: dict | None) -> tuple[int, str | None]:
+def score_fundamental(fund: dict | None) -> tuple[float, str | None]:
     """s3:基本面(0-20)。月營收 YoY 年增率。"""
     if not fund:
         return 8, None
     yoy = fund.get("yoy", 0.0)
-    s = max(0, min(20, round(8 + yoy * 0.24)))
+    # tanh 壓縮取代線性:原 yoy≥50% 即滿分 → 入選股 mean 19.65/20 飽和(discrim 4.9)。
+    # 改後 50%→14.7、100%→18.2、200%→19.8,高成長股之間仍分得出高下;
+    # 衰退側對稱:-40% 約 2.5 分,不會一路扣到 0 失去鑑別。
+    s = round(8 + 12 * math.tanh(yoy / 80.0), 1)
+    s = max(0.0, min(20.0, s))
     note = None
     if yoy >= 30:
         note = f"營收年增{yoy:.0f}%"
@@ -94,14 +104,17 @@ def score_overseas(topic: str | None, topic_mom: float) -> tuple[int, str | None
     return s, note
 
 
-def score_topic_news(topic: str | None, heat: int) -> tuple[int, str | None]:
+def score_topic_news(topic: str | None, heat: int) -> tuple[float, str | None]:
     """
     s5:題材熱度(0-15)★題材面。所屬題材近 3 日新聞則數。
     熱度高 = 市場正在炒作該題材(如黃仁勳來台帶動 AI)。
     """
     if topic is None:
         return 6, None
-    s = max(0, min(15, round(6 + heat * 0.5)))
+    # tanh 壓縮:原 heat≥18 則即滿分,大題材(AI 伺服器動輒 17+ 則)全擠在頂。
+    # 改後 6 則→9.4、17 則→14.0、30 則→14.9,熱與爆熱仍分得開。
+    s = round(6 + 9 * math.tanh(heat / 12.0), 1)
+    s = max(0.0, min(15.0, s))
     note = None
     if heat >= 15:
         note = f"{topic}題材爆量({heat}則)"
