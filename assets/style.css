@@ -474,6 +474,7 @@ body.dark .fc-meta{color:#8b92a6}
 .fpc-v.up{color:#ef4444}.fpc-v.down{color:#16a34a}
 .fpc-read{font-size:12px;color:#6b7280}
 .fut-note{background:#f8fafc;border-left:3px solid #818cf8;border-radius:8px;padding:11px 14px;font-size:12px;color:#475067;line-height:1.7}
+.fut-loading{display:inline-block;margin-top:6px;color:#6366f1;font-weight:600}
 body.dark .fut-intro{background:rgba(99,102,241,.12);border-color:rgba(129,140,248,.3);color:#c7d2fe}
 body.dark .fut-verdict.neutral{background:#171a22;border-color:#2a2f3a}
 body.dark .fv-reason{color:#c2c8d4}
