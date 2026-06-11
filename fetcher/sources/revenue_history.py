@@ -13,7 +13,7 @@ import re
 import time
 import urllib.request
 
-BASE = "https://mopsov.twse.com.tw/nas/t21/sii"
+BASE = "https://mopsov.twse.com.tw/nas/t21"   # /sii(上市)/otc(上櫃)同格式
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 # 列格式:<tr align=right><td align=center>2330</td><td align=left>台積電</td>
 #         <td>當月營收</td><td>上月</td><td>去年當月</td><td>上月增減%</td><Td>去年同月增減%</Td>…
@@ -28,25 +28,26 @@ def _num(s: str) -> float | None:
         return None
 
 
-def fetch_month(year: int, month: int) -> dict[str, float]:
-    """抓某西元年月的上市全公司月營收 YoY%。回 {code: yoy};檔案不存在(未公布)回 {}。"""
-    url = f"{BASE}/t21sc03_{year - 1911}_{month}_0.html"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=40) as r:
-            txt = r.read().decode("big5", errors="replace")
-    except Exception:  # noqa: BLE001 — 未公布/網路失敗 → 該月無資料
-        return {}
+def fetch_month(year: int, month: int, markets: tuple = ("sii", "otc")) -> dict[str, float]:
+    """抓某西元年月的全公司月營收 YoY%(上市 sii + 上櫃 otc)。回 {code: yoy};未公布回 {}。"""
     out: dict[str, float] = {}
-    for row in txt.split("<tr")[1:]:
-        cells = _CELL.findall(row)
-        if len(cells) <= _YOY_IDX:
+    for mk in markets:
+        url = f"{BASE}/{mk}/t21sc03_{year - 1911}_{month}_0.html"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=40) as r:
+                txt = r.read().decode("big5", errors="replace")
+        except Exception:  # noqa: BLE001 — 未公布/網路失敗 → 該市場該月無資料
             continue
-        code = cells[0].strip()
-        if len(code) != 4 or not code.isdigit():
-            continue
-        yoy = _num(cells[_YOY_IDX])
-        if yoy is not None:
-            out[code] = yoy
+        for row in txt.split("<tr")[1:]:
+            cells = _CELL.findall(row)
+            if len(cells) <= _YOY_IDX:
+                continue
+            code = cells[0].strip()
+            if len(code) != 4 or not code.isdigit():
+                continue
+            yoy = _num(cells[_YOY_IDX])
+            if yoy is not None:
+                out[code] = yoy
     return out
 
 

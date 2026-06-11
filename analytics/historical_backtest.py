@@ -36,6 +36,9 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": 
            "Referer": "https://www.twse.com.tw/"}
 
 UNIVERSE_N = 300        # 回測標的池:成交值前 N 大上市股
+TPEX_N = 150            # 另納成交值前 N 大上櫃股(正式評分含上櫃,回測池跟上才公允)
+TPEX_RWD = "https://www.tpex.org.tw/www/zh-tw"
+MKT: dict[str, str] = {}   # code → "twse"/"tpex"(_universe 填,價量抓取與籌碼分流用)
 LOOKBACK = 240          # 回填近 N 交易日(約一年,涵蓋多/空不同市況,避免純多頭小樣本假象)
 WARMUP = 20             # 前段暖身(算均線/RSI 需要)
 FORWARD = [5, 10, 20, 60]   # 後續報酬窗口(交易日)— 60 對齊前端每日快照回測的窗口
@@ -75,9 +78,12 @@ def _get(url: str, tries: int = 3) -> dict | None:
     return None
 
 
-def _universe(n: int = UNIVERSE_N, offset: int = 0) -> list[str]:
-    """成交值排名 offset~offset+n 的上市普通股(4 碼數字、排除 00 開頭 ETF)。
-    offset=0 取前 N 大(大型);offset>0 可取中小型股做分層對比。"""
+def _universe(n: int = UNIVERSE_N, offset: int = 0, tpex_n: int = TPEX_N) -> list[str]:
+    """
+    回測標的池 = 成交值排名 offset~offset+n 的上市普通股 + 前 tpex_n 大上櫃普通股。
+    offset 只套用上市(上櫃整體即中小型,潛伏池不需再 offset)。
+    同步填全域 MKT(code→市場),供價量抓取與籌碼端點分流。
+    """
     j = _get(f"{OPENAPI}/exchangeReport/STOCK_DAY_ALL")
     rows = []
     for r in (j or []):
@@ -85,7 +91,20 @@ def _universe(n: int = UNIVERSE_N, offset: int = 0) -> list[str]:
         if len(code) == 4 and code.isdigit() and not code.startswith("00"):
             rows.append((code, _num(r.get("TradeValue"))))
     rows.sort(key=lambda x: x[1], reverse=True)
-    return [c for c, _ in rows[offset:offset + n]]
+    out = [c for c, _ in rows[offset:offset + n]]
+    MKT.update({c: "twse" for c in out})
+    if tpex_n > 0:
+        tj = _get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes")
+        trows = []
+        for r in (tj or []):
+            code = str(r.get("SecuritiesCompanyCode", "")).strip()
+            if len(code) == 4 and code.isdigit() and not code.startswith("00"):
+                trows.append((code, _num(r.get("TransactionAmount"))))
+        trows.sort(key=lambda x: x[1], reverse=True)
+        tp = [c for c, _ in trows[:tpex_n] if c not in MKT]
+        MKT.update({c: "tpex" for c in tp})
+        out += tp
+    return out
 
 
 def _t86_day(ds: str, want: set) -> dict | None:
@@ -104,6 +123,52 @@ def _t86_day(ds: str, want: set) -> dict | None:
                 "trust": _num(row[_TRUST]), "dealer": _num(row[_DEALER]),
                 "total": _num(row[_TOTAL]),
             }
+    return out
+
+
+def _tpex_inst_day(ds: str, want: set) -> dict:
+    """單日上櫃個股三大法人(股)。欄位實測(6488 恆等式驗證):[10]外資及陸資合計、
+    [13]投信、[22]自營商合計、[23]三大法人合計。失敗回 {}(不拖垮整體回填)。"""
+    if not want:
+        return {}
+    d = f"{ds[:4]}/{ds[4:6]}/{ds[6:]}"
+    j = _get(f"{TPEX_RWD}/insti/dailyTrade?type=Daily&sect=EW&date={d}&id=&response=json")
+    if not j or j.get("stat") != "ok":
+        return {}
+    tbl = max(j.get("tables") or [], key=lambda t: len(t.get("data") or []), default=None)
+    if not tbl or not tbl.get("data"):
+        return {}
+    out = {}
+    for row in tbl["data"]:
+        if len(row) <= 23:
+            continue
+        code = str(row[0]).strip()
+        if code in want:
+            out[code] = {"foreign": _num(row[10]), "trust": _num(row[13]),
+                         "dealer": _num(row[22]), "total": _num(row[23])}
+    return out
+
+
+def _tpex_margin_full(ds: str, want: set) -> dict:
+    """單日上櫃個股融資券(張)。欄位:[2]前資餘額、[6]資餘額、[10]前券餘額、[14]券餘額。
+    單位與 TWSE(張)一致;評分只用相對變化,不受單位影響。失敗回 {}。"""
+    if not want:
+        return {}
+    d = f"{ds[:4]}/{ds[4:6]}/{ds[6:]}"
+    j = _get(f"{TPEX_RWD}/margin/balance?date={d}&response=json")
+    if not j or j.get("stat") != "ok":
+        return {}
+    tbl = max(j.get("tables") or [], key=lambda t: len(t.get("data") or []), default=None)
+    if not tbl or not tbl.get("data"):
+        return {}
+    out = {}
+    for row in tbl["data"]:
+        if len(row) <= 14:
+            continue
+        code = str(row[0]).strip()
+        if code in want:
+            out[code] = {"margin_bal": _num(row[6]), "margin_prev": _num(row[2]),
+                         "short_bal": _num(row[14]), "short_prev": _num(row[10])}
     return out
 
 
@@ -138,6 +203,7 @@ def _backfill_chips(universe: list[str]) -> tuple[dict, dict, list[str]]:
     連續 12+ 天無資料幾乎可斷定是限流 → 冷卻 90 秒重試,最多 4 次;仍不足則明示警告。
     """
     want = set(universe)
+    want_tpex = {c for c in want if MKT.get(c) == "tpex"}
     inst_by_date, mg_by_date, days = {}, {}, []
     today = datetime.now(TPE).date()
     misses, cooldowns, back = 0, 0, 0
@@ -156,8 +222,12 @@ def _backfill_chips(universe: list[str]) -> tuple[dict, dict, list[str]]:
             back += 1
             continue
         misses = 0
+        # 上櫃法人/融資(交易日以 T86 為準;TPEX 端點失敗回 {},不拖垮整體)
+        inst.update(_tpex_inst_day(ds, want_tpex))
+        mg = _margin_day(ds, want)
+        mg.update(_tpex_margin_full(ds, want_tpex))
         inst_by_date[ds] = inst
-        mg_by_date[ds] = _margin_day(ds, want)
+        mg_by_date[ds] = mg
         days.append(ds)
         time.sleep(0.25)   # 平時也放慢,降低觸發封鎖的機率
         back += 1
@@ -220,7 +290,7 @@ def run(universe: list | None = None, write: bool = True) -> dict:
     print(f"  universe {len(universe)} 檔;回填近 {LOOKBACK} 交易日籌碼…")
     inst_d, mg_d, days = _backfill_chips(universe)
     print(f"  籌碼回填 {len(days)} 交易日;抓 Yahoo 價量…")
-    px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12, rng="1y")
+    px = PriceHistorySource().fetch([(c, MKT.get(c, "twse")) for c in universe], workers=12, rng="1y")
     index = fetch_symbol(BENCHMARK, "1y")
     ov_hist = _backfill_overseas()
     rev = RevenueHistory()
@@ -309,9 +379,10 @@ def run(universe: list | None = None, write: bool = True) -> dict:
         "monotonic": _monotonic(quint_a),
         "strategy": {"dates": strat_dates, "top20": strat_top20, "bench20": strat_bench20},
         "note": ("評分五分位 q1(最低)~q5(最高)的後續報酬;q5 明顯高於 q1 代表評分有預測力。"
-                 "歷史評分含可回填五面向(僅缺題材新聞);報酬以「訊號次日收盤」進場計算"
-                 "(法人資料盤後公布,當日收盤買不到);月營收依法定公布日延遲生效,無未來資訊。"
-                 "universe 以今日成交值排名選取,極早期樣本可能有倖存者偏差。"),
+                 "歷史評分含可回填五面向(僅缺題材新聞);標的池=上市前300+上櫃前150大(與正式評分"
+                 "同樣涵蓋兩市場);報酬以「訊號次日收盤」進場計算(法人資料盤後公布,當日收盤買不到);"
+                 "月營收依法定公布日延遲生效,無未來資訊。universe 以今日成交值排名選取,"
+                 "極早期樣本可能有倖存者偏差。"),
     }
     return _write(result) if write else result
 
@@ -389,7 +460,7 @@ def run_stealth(universe: list | None = None, write: bool = True) -> dict:
         return _write_stealth({"status": "no_data", "msg": "無法取得 universe"})
     inst_d, mg_d, days = _backfill_chips(universe)
     print(f"  籌碼回填 {len(days)} 交易日;抓 Yahoo 價量…")
-    px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12, rng="2y")
+    px = PriceHistorySource().fetch([(c, MKT.get(c, "twse")) for c in universe], workers=12, rng="2y")
     index = fetch_symbol(BENCHMARK, "2y")
     ov_hist = _backfill_overseas()
     print(f"  價量 {len(px)}/{len(universe)} 檔;海外 {len(ov_hist)} 檔;開始潛伏回測…")

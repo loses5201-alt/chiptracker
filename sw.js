@@ -5,7 +5,7 @@
  *   - data/*.json:network-first(永遠先拿最新),離線才退回快取
  * 改版時把 VER 加一,舊快取會在 activate 時清掉。
  */
-const VER = "ct-v3";
+const VER = "ct-v4";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest",
   "assets/style.css",
