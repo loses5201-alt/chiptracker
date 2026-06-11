@@ -1,12 +1,12 @@
 {
  "status": "ok",
- "generated_at": "2026-06-09T20:25:00+08:00",
- "snapshot_days": 8,
+ "generated_at": "2026-06-11T21:02:54+08:00",
+ "snapshot_days": 10,
  "date_range": [
   "20260529",
-  "20260609"
+  "20260611"
  ],
- "recommendations_seen": 320,
+ "recommendations_seen": 400,
  "windows": [
   5,
   10,
@@ -18,10 +18,10 @@
  "groups": {
   "strong": {
    "5": {
-    "avg": -0.7,
-    "win_rate": 45.0,
-    "alpha": 1.02,
-    "n": 120
+    "avg": -1.88,
+    "win_rate": 40.0,
+    "alpha": 1.65,
+    "n": 200
    },
    "10": {
     "avg": null,
@@ -98,9 +98,9 @@
  "by_market": {
   "twse": {
    "5": {
-    "avg": -2.48,
-    "win_rate": 38.5,
-    "n": 78
+    "avg": -3.01,
+    "win_rate": 35.9,
+    "n": 156
    },
    "10": {
     "avg": null,
@@ -120,9 +120,9 @@
   },
   "tpex": {
    "5": {
-    "avg": -6.32,
-    "win_rate": 50.0,
-    "n": 2
+    "avg": -6.98,
+    "win_rate": 25.0,
+    "n": 4
    },
    "10": {
     "avg": null,
@@ -143,19 +143,19 @@
  },
  "factor_power": {
   "法人": {
-   "5": 9.47,
+   "5": 6.71,
    "10": null,
    "20": null,
    "60": null
   },
   "融資": {
-   "5": 5.12,
+   "5": 3.71,
    "10": null,
    "20": null,
    "60": null
   },
   "基本面": {
-   "5": -1.0,
+   "5": 2.09,
    "10": null,
    "20": null,
    "60": null
@@ -173,7 +173,7 @@
    "60": null
   },
   "技術": {
-   "5": 0.74,
+   "5": 2.78,
    "10": null,
    "20": null,
    "60": null
