@@ -1,6 +1,6 @@
 {
- "updated_at": "2026-06-09T20:23:06+08:00",
- "trading_date": "20260609",
+ "updated_at": "2026-06-11T15:17:09+08:00",
+ "trading_date": "20260610",
  "quarter_end": false,
  "universe": 120,
  "shown": 40,
@@ -20,54 +20,70 @@
   "futures": true
  },
  "topic_momentum": {
-  "記憶體": -7.29,
-  "AI伺服器": -7.76,
-  "CoWoS先進封裝": 2.69,
-  "矽智財IP": -15.28,
-  "蘋果供應鏈": -1.56
+  "記憶體": -9.56,
+  "AI伺服器": -11.68,
+  "晶圓代工": -7.62,
+  "IC設計": -16.64,
+  "CoWoS先進封裝": 0.64,
+  "矽光子CPO": -18.38,
+  "散熱": -13.44,
+  "機器人": -10.8,
+  "重電綠能": -4.46,
+  "軍工航太": 3.72,
+  "PCB": -6.43,
+  "矽智財IP": -11.31,
+  "被動元件": -9.66,
+  "蘋果供應鏈": -7.82,
+  "低軌衛星": -18.59,
+  "航運": 1.15,
+  "生技新藥": 2.83
  },
  "topic_heat": {
   "記憶體": 3,
-  "AI伺服器": 19,
+  "AI伺服器": 20,
+  "晶圓代工": 2,
+  "IC設計": 2,
   "CoWoS先進封裝": 0,
-  "矽光子CPO": 2,
-  "散熱": 0,
-  "機器人": 5,
-  "重電綠能": 1,
-  "軍工航太": 1,
-  "PCB": 10,
+  "矽光子CPO": 15,
+  "散熱": 1,
+  "機器人": 3,
+  "重電綠能": 0,
+  "軍工航太": 3,
+  "PCB": 7,
   "矽智財IP": 0,
   "被動元件": 1,
-  "蘋果供應鏈": 2,
-  "低軌衛星": 11
+  "蘋果供應鏈": 3,
+  "低軌衛星": 18,
+  "航運": 2,
+  "生技新藥": 0
  },
- "yahoo_ok": 282,
+ "yahoo_ok": 291,
  "market_pulse": {
-  "advancers": 719,
-  "decliners": 1391,
-  "unchanged": 115,
-  "breadth_pct": 34.1,
-  "inst_foreign": -917.3,
-  "inst_trust": 232.8,
-  "inst_dealer": -66.9,
-  "inst_total": -751.4,
-  "margin_chg_lots": -278002.0,
-  "margin_up_count": 524,
+  "advancers": 525,
+  "decliners": 1569,
+  "unchanged": 138,
+  "breadth_pct": 25.1,
+  "inst_foreign": -357.8,
+  "inst_trust": 127.9,
+  "inst_dealer": -124.0,
+  "inst_total": -353.9,
+  "margin_chg_lots": -193247.0,
+  "margin_up_count": 579,
   "hot_topics": [
    {
     "name": "AI伺服器",
-    "heat": 19,
-    "mom": -7.8
+    "heat": 20,
+    "mom": -11.7
+   },
+   {
+    "name": "軍工航太",
+    "heat": 3,
+    "mom": 3.7
    },
    {
     "name": "低軌衛星",
-    "heat": 11,
-    "mom": 0
-   },
-   {
-    "name": "PCB",
-    "heat": 10,
-    "mom": 0
+    "heat": 18,
+    "mom": -18.6
    }
   ],
   "mood": "headwind",
