@@ -7,6 +7,9 @@ on:
     # GitHub cron 為 UTC。09:30 UTC = 台北 17:30,確保法人/融資券當日資料已公布。
     # (排程可能延遲數分鐘至數十分鐘,屬正常現象)
     - cron: "30 9 * * 1-5"
+    # 補跑場:13:30 UTC = 台北 21:30。第一場若因 TWSE timeout 等原因失敗,這場補救;
+    # 第一場成功時由「今日資料已存在」守門步驟跳過,不會重複 commit。
+    - cron: "30 13 * * 1-5"
   workflow_dispatch: {}   # 也允許在 Actions 頁面手動觸發
 
 permissions:
@@ -32,27 +35,50 @@ jobs:
       - name: Install deps
         run: pip install -r fetcher/requirements.txt
 
+      - name: Guard — 今日資料已存在則跳過
+        # 補跑場守門:第一場已成功(meta.trading_date == 今天)就不重做,避免重複 commit。
+        # 假日兩場都會重建昨日資料,屬可接受的小噪音。
+        id: guard
+        run: |
+          TODAY=$(TZ=Asia/Taipei date +%Y%m%d)
+          CUR=$(python -c "import json;print(json.load(open('data/meta.json'))['trading_date'])" 2>/dev/null || echo none)
+          if [ "$TODAY" = "$CUR" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"; echo "今日($TODAY)資料已存在,跳過"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run unit tests
+        # 評分引擎單元測試:鎖住 s1~s6/潛伏/做空的已驗證行為,改壞就在這裡擋下
+        if: steps.guard.outputs.skip != 'true'
+        run: python -m unittest discover -s tests
+
       - name: Validate sources
         # 撈資料前先驗證上市/上櫃來源健康(筆數/恆等式/指標股/交易日一致)。
         # 失敗即中止,絕不拿壞資料去評分、也不會 commit 污染 data/。
+        if: steps.guard.outputs.skip != 'true'
         run: python -m fetcher.validate
 
       - name: Build data
         # DISCORD_WEBHOOK 為選用 Secret:設了就推播潛伏發動快報到 Discord(手機可收),
         # 沒設則 build 內自動略過、不影響資料更新。
+        if: steps.guard.outputs.skip != 'true'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: python -m fetcher.build
 
       - name: Run backtest
         # 用當天新存的快照 + 歷史快照,重算推薦成效(data/performance.json)
+        if: steps.guard.outputs.skip != 'true'
         run: python -m analytics.backtest
 
       - name: Run weight review
         # 評分面向健檢:六面向區分度/相關(data/weight_review.json)
+        if: steps.guard.outputs.skip != 'true'
         run: python -m analytics.weight_review
 
       - name: Commit data if changed
+        if: steps.guard.outputs.skip != 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -63,3 +89,13 @@ jobs:
             git commit -m "chore(data): 自動更新籌碼資料 $(date -u +%Y-%m-%d)"
             git push
           fi
+
+      - name: Notify failure to Discord
+        # build 在任何一步掛掉時推 Discord(build 內的 notify_health 來不及跑的情況,
+        # 例如今天 2026-06-10 STOCK_DAY_ALL timeout 在第一步就炸)。沒設 webhook 靜默略過。
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          [ -z "$DISCORD_WEBHOOK" ] && exit 0
+          curl -sS -H "Content-Type: application/json" -d "{\"username\":\"ChipTracker\",\"embeds\":[{\"title\":\"❌ daily-fetch 失敗\",\"description\":\"build 掛了,今天資料可能沒更新。Log:https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\",\"color\":15548997}]}" "$DISCORD_WEBHOOK"

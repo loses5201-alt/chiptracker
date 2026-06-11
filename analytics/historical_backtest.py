@@ -24,6 +24,7 @@ from pathlib import Path
 
 from fetcher import scoring, sectors
 from fetcher.sources.price_history import PriceHistorySource, fetch_symbol
+from fetcher.sources.revenue_history import RevenueHistory   # 月營收歷史(s3 回填)
 from fetcher.sources.stock_chip_history import _buy_streak  # 連買天數(與正式版同一套邏輯)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,9 +38,12 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": 
 UNIVERSE_N = 300        # 回測標的池:成交值前 N 大上市股
 LOOKBACK = 240          # 回填近 N 交易日(約一年,涵蓋多/空不同市況,避免純多頭小樣本假象)
 WARMUP = 20             # 前段暖身(算均線/RSI 需要)
-FORWARD = [5, 10, 20]   # 後續報酬窗口(交易日)
+FORWARD = [5, 10, 20, 60]   # 後續報酬窗口(交易日)— 60 對齊前端每日快照回測的窗口
 TOP_N = 10              # 每日選前幾名當「策略持股」
 BENCHMARK = "^TWII"
+# 防 lookahead:法人/融資是「盤後」公布,訊號日收盤根本買不到。
+# 報酬一律以「訊號次日收盤」為進場基準(可實際執行的報酬),大盤基準同步位移。
+ENTRY_LAG = 1
 
 # 潛伏回測:潛伏要等發動,窗口拉長(5/10 日太短)
 STEALTH_FORWARD = [10, 20, 40, 60]
@@ -126,22 +130,40 @@ def _margin_day(ds: str, want: set) -> dict:
 
 
 def _backfill_chips(universe: list[str]) -> tuple[dict, dict, list[str]]:
-    """回填近 LOOKBACK 交易日法人/融資。回 (inst_by_date, mg_by_date, trading_days舊→新)。"""
+    """
+    回填近 LOOKBACK 交易日法人/融資。回 (inst_by_date, mg_by_date, trading_days舊→新)。
+
+    ⚠️ 限流自癒:TWSE RWD 對大量回填會封鎖一段時間(實測連跑兩輪 240 天就中標),
+    被封時 _t86_day 一路回 None,看起來像「連續非交易日」。台股最長連假約 10 天,
+    連續 12+ 天無資料幾乎可斷定是限流 → 冷卻 90 秒重試,最多 4 次;仍不足則明示警告。
+    """
     want = set(universe)
     inst_by_date, mg_by_date, days = {}, {}, []
     today = datetime.now(TPE).date()
-    for back in range(LOOKBACK * 2):
-        if len(days) >= LOOKBACK:
-            break
+    misses, cooldowns, back = 0, 0, 0
+    while back < LOOKBACK * 2 and len(days) < LOOKBACK:
         ds = (today - timedelta(days=back)).strftime("%Y%m%d")
         inst = _t86_day(ds, want)
         if inst is None:
-            time.sleep(0.15)
+            misses += 1
+            if misses >= 12 and cooldowns < 4:
+                print(f"  ⚠️ 疑似被 TWSE 限流(連續 {misses} 天無資料),冷卻 90 秒後重試…")
+                time.sleep(90)
+                cooldowns += 1
+                misses = 0
+                continue   # 冷卻後重試同一天,不跳過
+            time.sleep(0.3)
+            back += 1
             continue
+        misses = 0
         inst_by_date[ds] = inst
         mg_by_date[ds] = _margin_day(ds, want)
         days.append(ds)
+        time.sleep(0.25)   # 平時也放慢,降低觸發封鎖的機率
+        back += 1
     days.reverse()
+    if len(days) < LOOKBACK:
+        print(f"  ⚠️ 僅回填 {len(days)}/{LOOKBACK} 交易日(可能仍在限流期),統計力下降")
     return inst_by_date, mg_by_date, days
 
 
@@ -168,20 +190,25 @@ def _topic_mom_at(ds: str, ov_hist: dict) -> dict:
     return sectors.topic_overseas_momentum(sym_mom)
 
 
-def _simplified_score(inst, mg, closes, vol, avg_vol, topic=None, topic_mom=0.0) -> int:
-    """歷史可回填的四面向:s1 法人 + s2 融資 + s4 國際 + s6 技術(滿分 65)。
-    s4 用該股題材的海外同業近5日動能(海外歷史可回填);無題材時 score_overseas 給中性。"""
+def _simplified_score(inst, mg, closes, vol, avg_vol, topic=None, topic_mom=0.0,
+                      yoy=None) -> float:
+    """歷史可回填的五面向:s1 法人 + s2 融資 + s3 基本面 + s4 國際 + s6 技術(滿分 85)。
+    s3 用 MOPS 月營收歷史(已含公布延遲防 lookahead);s4 用題材海外同業近5日動能;
+    缺資料時各自退中性,離正式評分只差 s5 題材新聞(真無歷史)。"""
     s1, _ = scoring.score_institutional(inst, vol)
     s2, _ = scoring.score_margin_short(mg, inst)
+    s3, _ = scoring.score_fundamental({"yoy": yoy} if yoy is not None else None)
     s4, _ = scoring.score_overseas(topic, topic_mom)
     s6, _, _, _ = scoring.score_momentum(closes, vol, avg_vol)
-    return s1 + s2 + s4 + s6
+    return s1 + s2 + s3 + s4 + s6
 
 
 def _forward(closes: list[float], i: int, w: int) -> float | None:
-    j = i + w
-    if j < len(closes) and closes[i] > 0:
-        return round((closes[j] - closes[i]) / closes[i] * 100, 2)
+    """訊號日 i 之後的 w 日報酬,以次日收盤(i+ENTRY_LAG)為進場基準 — 見 ENTRY_LAG 註解。"""
+    base = i + ENTRY_LAG
+    j = base + w
+    if j < len(closes) and base < len(closes) and closes[base] > 0:
+        return round((closes[j] - closes[base]) / closes[base] * 100, 2)
     return None
 
 
@@ -196,10 +223,17 @@ def run(universe: list | None = None, write: bool = True) -> dict:
     px = PriceHistorySource().fetch([(c, "twse") for c in universe], workers=12, rng="1y")
     index = fetch_symbol(BENCHMARK, "1y")
     ov_hist = _backfill_overseas()
-    print(f"  價量 {len(px)}/{len(universe)} 檔;大盤 {'OK' if index else '失敗'};海外 {len(ov_hist)} 檔;開始回測…")
+    rev = RevenueHistory()
+    rev_n = rev.load(days[0], days[-1]) if days else 0
+    print(f"  價量 {len(px)}/{len(universe)} 檔;大盤 {'OK' if index else '失敗'};"
+          f"海外 {len(ov_hist)} 檔;月營收 {rev_n} 個月;開始回測…")
 
     # 可回測日:留前 WARMUP 暖身、後 max(FORWARD) 觀察
     test_days = days[WARMUP: len(days) - max(FORWARD)] if len(days) > WARMUP + max(FORWARD) else []
+    if not test_days:
+        # 回填不足(多半是被限流)→ 不覆寫既有結果檔,保住上一次的有效數據
+        print(f"  ✗ 可回測日為 0(回填僅 {len(days)} 天),不覆寫既有結果,請稍後重跑")
+        return {"status": "insufficient", "msg": f"回填僅 {len(days)} 交易日,不足以回測"}
     quint = {q: {w: [] for w in FORWARD} for q in range(5)}      # 五分位後續報酬(絕對)
     quint_a = {q: {w: [] for w in FORWARD} for q in range(5)}    # 五分位超額報酬(扣大盤)
     top_ret = {w: [] for w in FORWARD}                            # top N 報酬
@@ -224,7 +258,8 @@ def run(universe: list | None = None, write: bool = True) -> dict:
             inst = inst_d.get(ds, {}).get(code, {})
             mg = mg_d.get(ds, {}).get(code, {})
             topic, tm = sectors.best_topic_for(code, tmom)
-            sc = _simplified_score(inst, mg, closes, vol, avg_vol, topic, tm)
+            sc = _simplified_score(inst, mg, closes, vol, avg_vol, topic, tm,
+                                   rev.yoy_at(code, ds))
             scored.append((sc, code, i))
         if len(scored) < 10:
             continue
@@ -268,13 +303,15 @@ def run(universe: list | None = None, write: bool = True) -> dict:
         "test_days": len(test_days),
         "date_range": [days[0], days[-1]] if days else [],
         "windows": FORWARD, "top_n": TOP_N, "benchmark": BENCHMARK,
-        "factors_used": "s1法人 + s2融資 + s4國際 + s6技術(可回填四面向,滿分65)",
+        "factors_used": "s1法人 + s2融資 + s3基本面 + s4國際 + s6技術(可回填五面向,滿分85)",
         "quintile": {f"q{q+1}": {str(w): _stat(quint[q][w], quint_a[q][w]) for w in FORWARD} for q in range(5)},
         "top": {str(w): _stat(top_ret[w], top_alpha[w]) for w in FORWARD},
         "monotonic": _monotonic(quint_a),
         "strategy": {"dates": strat_dates, "top20": strat_top20, "bench20": strat_bench20},
         "note": ("評分五分位 q1(最低)~q5(最高)的後續報酬;q5 明顯高於 q1 代表評分有預測力。"
-                 "歷史評分僅含可回填的籌碼+技術三面向。"),
+                 "歷史評分含可回填五面向(僅缺題材新聞);報酬以「訊號次日收盤」進場計算"
+                 "(法人資料盤後公布,當日收盤買不到);月營收依法定公布日延遲生效,無未來資訊。"
+                 "universe 以今日成交值排名選取,極早期樣本可能有倖存者偏差。"),
     }
     return _write(result) if write else result
 
@@ -360,6 +397,9 @@ def run_stealth(universe: list | None = None, write: bool = True) -> dict:
     W = STEALTH_FORWARD
     maxw = max(W)
     test_days = days[WARMUP: len(days) - maxw] if len(days) > WARMUP + maxw else []
+    if not test_days:
+        print(f"  ✗ 可回測日為 0(回填僅 {len(days)} 天),不覆寫既有結果,請稍後重跑")
+        return {"status": "insufficient", "msg": f"回填僅 {len(days)} 交易日,不足以回測"}
     quint = {q: {w: [] for w in W} for q in range(5)}
     quint_a = {q: {w: [] for w in W} for q in range(5)}
     st_ret = {w: [] for w in W}; st_alpha = {w: [] for w in W}      # 潛伏 top
