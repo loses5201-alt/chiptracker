@@ -5,11 +5,12 @@
  *   - data/*.json:network-first(永遠先拿最新),離線才退回快取
  * 改版時把 VER 加一,舊快取會在 activate 時清掉。
  */
-const VER = "ct-v4";
+const VER = "ct-v5";
 const SHELL = [
   "./", "index.html", "manifest.webmanifest",
   "assets/style.css",
   "assets/js/01-core.js", "assets/js/02-components.js", "assets/js/03-views.js",
+  "assets/js/03b-backtest.js",
   "assets/js/04-futures.js", "assets/js/05-stealth-short-watch.js", "assets/js/99-boot.js",
   "assets/icons/icon-192.png", "assets/icons/icon-512.png",
 ];
