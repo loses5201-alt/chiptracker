@@ -81,7 +81,7 @@ function renderFutures(box) {
   const compCls = bull > bear ? "bull" : bear > bull ? "bear" : "neutral";
   const compTag = bull > bear ? "偏多" : bear > bull ? "偏空" : "中性";
 
-  const intro = `<div class="fut-intro"><b>📊 期貨風向(大盤多空)</b> — 個股籌碼看「誰買哪檔」,期貨籌碼看「大戶對整個大盤的押注」。下方<b>綜合判讀</b>把外資/大戶/散戶/選擇權各面向匯總成多空傾向。資料日 ${f.date}。程式訊號、非投資建議。</div>`;
+  const intro = `<div class="fut-intro"><b>期貨風向(大盤多空)</b> — 個股籌碼看「誰買哪檔」,期貨籌碼看「大戶對整個大盤的押注」。下方<b>綜合判讀</b>把外資/大戶/散戶/選擇權各面向匯總成多空傾向。資料日 ${f.date}。程式訊號、非投資建議。</div>`;
 
   // 綜合判讀面板(多空票數 + 各訊號)
   const sigChips = sig.map((s) => `<span class="sig-chip ${s.side === "多" ? "up" : "down"}">${s.txt}</span>`).join("");
@@ -141,9 +141,9 @@ function renderFutures(box) {
 
   const enriching = !FUT_ENRICHED && (rRatio == null || b5net == null || !(ssf.top && ssf.top.length));
   box.innerHTML = intro + verdict + oiCards + vsBlock + pcBlock + ssfBlock +
-    `<div class="fut-note">📖 怎麼看:<b>外資台指期/前五大特定法人</b>淨多(紅/正)=大戶押漲、淨空(綠/負)=押跌;
+    `<div class="fut-note">怎麼看:<b>外資台指期/前五大特定法人</b>淨多(紅/正)=大戶押漲、淨空(綠/負)=押跌;
      <b>散戶多空比</b>是反指標(散戶越偏多越要小心);<b>P/C 未平倉比</b>偏高常代表低檔有撐;
-     <b>個股期貨未平倉</b>大的個股是大戶在期貨市場重押的標的。趨勢需逐日累積(目前 ${h.length} 日)。${enriching ? '<br><span class="fut-loading">⏳ 散戶/大額交易人/個股期貨資料載入中(由瀏覽器即時向期交所取得)…</span>' : ""}</div>` +
+     <b>個股期貨未平倉</b>大的個股是大戶在期貨市場重押的標的。趨勢需逐日累積(目前 ${h.length} 日)。${enriching ? '<br><span class="fut-loading">散戶/大額交易人/個股期貨資料載入中(由瀏覽器即時向期交所取得)…</span>' : ""}</div>` +
     footNote();
   enrichFutures();   // 由瀏覽器(台灣IP)補抓地理敏感端點,完成後自動重繪
 }

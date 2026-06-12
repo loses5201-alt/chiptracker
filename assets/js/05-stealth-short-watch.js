@@ -13,7 +13,7 @@ function stealthProgress(s) {
   const stage = trig ? "已發動" : pos < 35 ? "深埋伏" : pos <= 65 ? "蓄勢中" : "將發動";
   return `<div class="stealth-prog${trig ? " fired" : ""}">
     <div class="sp-track"><div class="sp-fill" style="width:${pct}%"></div><div class="sp-dot" style="left:${pct}%"></div></div>
-    <div class="sp-foot"><div class="sp-labels"><span>潛伏</span><span>蓄勢</span><span>發動</span></div><div class="sp-stage">${trig ? "🚀 " : ""}${stage}</div></div>
+    <div class="sp-foot"><div class="sp-labels"><span>潛伏</span><span>蓄勢</span><span>發動</span></div><div class="sp-stage">${stage}</div></div>
   </div>`;
 }
 
@@ -35,7 +35,7 @@ function stealthCard(s, idx) {
         <div class="px-row"><span class="stock-px">${s.close || "—"}</span></div>
       </div>
       <div class="ct-right">
-        <div class="score-ring stealth"><span>${s.score}</span><small>伏</small></div>
+        <div class="score-ring stealth"><span>${fmtScore(s.score)}</span><small>伏</small></div>
         <div class="pill stealth">${STEALTH_TEXT[s.rec]}</div>
       </div>
     </div>
@@ -55,7 +55,7 @@ function renderStealth(box) {
     box.innerHTML = '<div class="empty" style="padding:50px">今日無明顯潛伏標的(法人尚未明顯在低基期吃貨)</div>' + footNote();
     return;
   }
-  const intro = `<div class="stealth-intro"><b>🎯 主力潛伏(起漲前布局)</b> — 法人默默吃貨、股價還在低基期沒發動,跟著大戶提前埋伏。<b>這是「跟著大戶賺大錢」的核心</b>。需耐心(可能先盤整),此為程式訊號、非投資建議,務必停損。</div>`;
+  const intro = `<div class="stealth-intro"><b>主力潛伏(起漲前布局)</b> — 法人默默吃貨、股價還在低基期沒發動,跟著大戶提前埋伏。<b>這是「跟著大戶賺大錢」的核心</b>。需耐心(可能先盤整),此為程式訊號、非投資建議,務必停損。</div>`;
   box.innerHTML = intro + firedBlock() + `<div class="grid">${STEALTH.map((s, i) => stealthCard(s, i)).join("")}</div>` + footNote();
   box.querySelectorAll(".card, .fired-card").forEach((el) =>
     el.addEventListener("click", () => openStealthDetail(el.dataset.code)));
@@ -79,7 +79,7 @@ function firedBlock() {
       <div class="fc-meta">進榜 ${e.enter_px}(${fmtDate(e.enter_date)})→ 發動 ${fmtDate(e.triggered_date)} · 埋伏 ${days} 日</div>
     </div>`;
   }).join("");
-  return `<div class="fired-wrap"><div class="fired-head">🚀 已發動 <small>埋伏後出現放量突破訊號的潛伏股(${fired.length})</small></div>
+  return `<div class="fired-wrap"><div class="fired-head">已發動 <small>埋伏後出現放量突破訊號的潛伏股(${fired.length})</small></div>
     <div class="fired-grid">${cards}</div></div>`;
 }
 
@@ -94,11 +94,11 @@ function openStealthDetail(code) {
     <div class="m-head">
       <div>
         <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
-        <div class="m-px">${s.close || "—"} <span class="pill stealth">${STEALTH_TEXT[s.rec]} ${s.score}分</span></div>
+        <div class="m-px">${s.close || "—"} <span class="pill stealth">${STEALTH_TEXT[s.rec]} ${fmtScore(s.score)}分</span></div>
       </div>
       <button class="m-close" id="m-close">✕</button>
     </div>
-    <div class="note" style="border-left:4px solid #f0b429">🎯 主力潛伏:法人默默吃貨、股價還沒發動。提前布局需耐心(可能先盤整),非投資建議,務必停損。</div>
+    <div class="note" style="border-left:3px solid var(--gold)">主力潛伏:法人默默吃貨、股價還沒發動。提前布局需耐心(可能先盤整),非投資建議,務必停損。</div>
     <div class="m-section">埋伏進度</div>
     ${stealthProgress(s)}
     <div class="m-section">潛伏理由</div>
@@ -129,7 +129,7 @@ function shortCard(s, idx) {
         <div class="px-row"><span class="stock-px">${s.close || "—"}</span></div>
       </div>
       <div class="ct-right">
-        <div class="score-ring short"><span>${s.score}</span><small>空</small></div>
+        <div class="score-ring short"><span>${fmtScore(s.score)}</span><small>空</small></div>
         <div class="pill short">${SHORT_TEXT[s.rec]}</div>
       </div>
     </div>
@@ -148,13 +148,13 @@ function renderShorts(box) {
     box.innerHTML = '<div class="empty" style="padding:50px">今日無明顯做空標的</div>' + footNote();
     return;
   }
-  const intro = `<div class="short-intro"><b>⚠️ 做空訊號(高檔回落 / 業績轉弱)</b> — 做空風險高(軋空、損失無上限),此為程式訊號、非投資建議,務必嚴設停損。</div>`;
+  const intro = `<div class="short-intro"><b>做空訊號(高檔回落 / 業績轉弱)</b> — 做空風險高(軋空、損失無上限),此為程式訊號、非投資建議,務必嚴設停損。</div>`;
   const strong = SHORTS.filter((s) => s.rec === "strong").length;
   const hiPledge = SHORTS.filter((s) => (s.pledge || 0) >= 40).length;
   const rc = {};
   SHORTS.forEach((s) => (s.reason || []).forEach((r) => { rc[r] = (rc[r] || 0) + 1; }));
   const topR = Object.entries(rc).sort((a, b) => b[1] - a[1])[0];
-  const analysis = `<div class="list-analysis short"><div class="la-t">📊 做空標的分析</div><div class="la-b">今日 <b>${SHORTS.length}</b> 檔做空訊號,其中 <b class="down">${strong}</b> 檔強訊號${hiPledge ? `、<b>${hiPledge}</b> 檔董監設質≥40%(股價跌易斷頭追繳、助跌)` : ""}。最常見做空理由:<b>${topR ? topR[0] : "—"}</b>。做空優先挑「漲多+營收沒跟上+法人出貨」三者俱全的,風險高務必停損。</div></div>`;
+  const analysis = `<div class="list-analysis short"><div class="la-t">做空標的分析</div><div class="la-b">今日 <b>${SHORTS.length}</b> 檔做空訊號,其中 <b class="down">${strong}</b> 檔強訊號${hiPledge ? `、<b>${hiPledge}</b> 檔董監設質≥40%(股價跌易斷頭追繳、助跌)` : ""}。最常見做空理由:<b>${topR ? topR[0] : "—"}</b>。做空優先挑「漲多+營收沒跟上+法人出貨」三者俱全的,風險高務必停損。</div></div>`;
   box.innerHTML = intro + analysis + `<div class="grid">${SHORTS.map((s, i) => shortCard(s, i)).join("")}</div>` + footNote();
   box.querySelectorAll(".card").forEach((el) =>
     el.addEventListener("click", () => openShortDetail(el.dataset.code)));
@@ -167,11 +167,11 @@ function openShortDetail(code) {
     <div class="m-head">
       <div>
         <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</div>
-        <div class="m-px">${s.close || "—"} <span class="pill short">${SHORT_TEXT[s.rec]} ${s.score}分</span></div>
+        <div class="m-px">${s.close || "—"} <span class="pill short">${SHORT_TEXT[s.rec]} ${fmtScore(s.score)}分</span></div>
       </div>
       <button class="m-close" id="m-close">✕</button>
     </div>
-    <div class="note" style="border-left:4px solid #f59e0b">⚠️ 做空訊號,非投資建議。軋空風險高、損失無上限,務必設停損。</div>
+    <div class="note" style="border-left:3px solid var(--gold)">做空訊號,非投資建議。軋空風險高、損失無上限,務必設停損。</div>
     <div class="m-section">做空理由</div>
     <div class="m-reason">${(s.reason || []).map((r) => `<span class="badge short">${r}</span>`).join("")}</div>
     ${s.yoy != null ? `<div class="dl"><span class="k">月營收 YoY</span><span class="v ${s.yoy >= 0 ? "up" : "down"}">${s.yoy >= 0 ? "+" : ""}${s.yoy}%</span></div>` : ""}
@@ -212,8 +212,8 @@ function renderWatchlist(box) {
     ? wl.map((c) => stockRow(findStock(c))).join("")
     : '<div class="empty" style="padding:24px">尚無自選股 — 搜尋後點 ☆ 加入追蹤</div>';
   box.innerHTML = `
-    <div class="search-bar"><input id="stock-search" type="search" autocomplete="off" placeholder="🔍 輸入代號或名稱,查全市場 ${total} 檔評分"></div>
-    <div class="m-section">⭐ 自選股 (${wl.length})</div>
+    <div class="search-bar"><input id="stock-search" type="search" autocomplete="off" placeholder="輸入代號或名稱,查全市場 ${total} 檔評分"></div>
+    <div class="m-section">自選股 (${wl.length})</div>
     <div id="watch-list" class="srows">${watchRows}</div>
     <div class="m-section">搜尋結果</div>
     <div id="search-result" class="srows"><div class="muted" style="padding:14px">在上方輸入關鍵字…</div></div>
@@ -240,22 +240,22 @@ function renderWatchlist(box) {
 function footNote() {
   const s = META.sources || {};
   return `<div class="note">
-    ⚠️ 本站為個人技術練習,所有評分與進出價皆由程式依公開資料自動估算,<b>非投資建議</b>,
+    本站為個人技術練習,所有評分與進出價皆由程式依公開資料自動估算,<b>非投資建議</b>,
     短線追高風險高,請自設停損。
     題材熱度為新聞則數的代理指標;分點(主力)資料${s.broker ? "已啟用" : "未啟用"}。
     資料來源:證交所(上市)+ 櫃買中心(上櫃)法人/融資券/價量、證交所月營收 + Yahoo Finance(台股歷史/海外同業)+ Google News(題材新聞)。
   </div>`;
 }
 
-// 深色 / 淺色切換,選擇記在 localStorage(body 開頭的 inline script 負責首載防閃)
+// 主題切換:深色為預設,淺色是手動選項(body 開頭的 inline script 負責首載防閃)
 function setupTheme() {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
-  const sync = () => { btn.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙"; };
+  const sync = () => { btn.innerHTML = icon(document.body.classList.contains("light") ? "moon" : "sun"); };
   sync();
   btn.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("ct-theme", document.body.classList.contains("dark") ? "dark" : "light");
+    document.body.classList.toggle("light");
+    localStorage.setItem("ct-theme", document.body.classList.contains("light") ? "light" : "dark");
     sync();
   });
 }

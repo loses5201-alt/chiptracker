@@ -47,11 +47,11 @@ function historicalBlock() {
     return q5 && q1 && q5.alpha != null && q1.alpha != null && q5.alpha > q1.alpha;
   }).length;
   const conclusion = goodCount >= 2
-    ? `<div class="note" style="border-left:4px solid #22c55e"><b>✓ 本期發現:</b>放大樣本(${h.universe} 檔 × ${h.test_days} 交易日,涵蓋更多市況)後評分顯示<b>預測力</b> — 高分組 q5 的後續超額報酬高於低分組 q1、勝率亦隨分數遞增。先前小樣本/純多頭期看到的「無區分力」是樣本不足 + beta 蓋過所致。top${h.top_n} 超額穩定為正。</div>`
-    : `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 本期發現:</b>五分位區分力有限,top${h.top_n} 超額為正但整體待強化;完整預測力可能還需題材新聞面(無歷史)。</div>`;
+    ? `<div class="note" style="border-left:3px solid var(--dn)"><b>✓ 本期發現:</b>放大樣本(${h.universe} 檔 × ${h.test_days} 交易日,涵蓋更多市況)後評分顯示<b>預測力</b> — 高分組 q5 的後續超額報酬高於低分組 q1、勝率亦隨分數遞增。先前小樣本/純多頭期看到的「無區分力」是樣本不足 + beta 蓋過所致。top${h.top_n} 超額穩定為正。</div>`
+    : `<div class="note" style="border-left:3px solid var(--gold)"><b>本期發現:</b>五分位區分力有限,top${h.top_n} 超額為正但整體待強化;完整預測力可能還需題材新聞面(無歷史)。</div>`;
   const st = h.strategy || { top20: [], bench20: [] };
   const avg = (a) => a.length ? (a.reduce((x, y) => x + y, 0) / a.length).toFixed(2) : "—";
-  return `<div class="m-section">📈 歷史回測(${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")})</div>
+  return `<div class="m-section">歷史回測(${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")})</div>
     <div class="note" style="margin-top:0">標的池 ${h.universe} 檔(上市+上櫃,成交值排名);歷史評分 = ${h.factors_used}</div>
     <div class="m-section" style="font-size:12.5px">評分五分位後續報酬(最高分 q5 應高於最低分 q1 = 評分有效)</div>
     <div class="table-wrap"><table class="bt-table"><thead><tr><th>分位</th>${W.map((w) => `<th>${w} 日</th>`).join("")}</tr></thead><tbody>${qRows}</tbody></table></div>
@@ -84,8 +84,8 @@ function stealthBacktestBlock() {
   }).join("");
   // 潛伏 top vs 動能 top 超額對照
   const cmpRows = [
-    { k: "stealth_top", t: "主力潛伏 top", c: "#f59e0b" },
-    { k: "momentum_top", t: "動能選股 top（對照）", c: "#64748b" },
+    { k: "stealth_top", t: "主力潛伏 top", c: "var(--gold)" },
+    { k: "momentum_top", t: "動能選股 top（對照）", c: "var(--tx3)" },
   ].map((g) => `<tr><td class="bt-grp"><span class="dot" style="background:${g.c}"></span>${g.t}</td>
     ${W.map((w) => {
       const d = h[g.k][String(w)];
@@ -97,9 +97,9 @@ function stealthBacktestBlock() {
   const stPos = W.filter((w) => { const d = h.stealth_top[String(w)]; return d && d.alpha != null && d.alpha > 0; }).length;
   const lead = h.lead_days_median;
   const concl = stPos >= Math.ceil(W.length / 2)
-    ? `<div class="note" style="border-left:4px solid #f59e0b"><b>✓ 潛伏邏輯有效:</b>主力潛伏 top 多數窗口超額報酬為正${lead != null ? `,埋伏後中位數 <b>${lead} 個交易日</b>內首次達 +${h.lead_pct}%` : ""} — 確實能提前抓到發動前的標的。</div>`
-    : `<div class="note" style="border-left:4px solid #f59e0b"><b>⚠️ 潛伏邏輯待強化:</b>top 超額尚不穩定,將依此回測調整潛伏評分權重(低基期/連買/量縮),再以集保大戶資料強化。</div>`;
-  return `<div class="m-section">🪙 主力潛伏回測（${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")}）</div>
+    ? `<div class="note" style="border-left:3px solid var(--gold)"><b>✓ 潛伏邏輯有效:</b>主力潛伏 top 多數窗口超額報酬為正${lead != null ? `,埋伏後中位數 <b>${lead} 個交易日</b>內首次達 +${h.lead_pct}%` : ""} — 確實能提前抓到發動前的標的。</div>`
+    : `<div class="note" style="border-left:3px solid var(--gold)"><b>潛伏邏輯待強化:</b>top 超額尚不穩定,將依此回測調整潛伏評分權重(低基期/連買/量縮),再以集保大戶資料強化。</div>`;
+  return `<div class="m-section">主力潛伏回測（${h.test_days} 個交易日樣本 · ${(h.date_range || []).join(" ~ ")}）</div>
     <div class="note" style="margin-top:0">驗證核心問題:<b>潛伏分高的股,埋伏後真的會「發動」嗎?</b>標的池 ${h.universe} 檔(上市+上櫃,成交值排名)。</div>
     <div class="m-section" style="font-size:12.5px">潛伏分五分位後續報酬(最高分 q5 應高於最低分 q1)</div>
     <div class="table-wrap"><table class="bt-table"><thead><tr><th>分位</th>${W.map((w) => `<th>${w} 日</th>`).join("")}</tr></thead><tbody>${qRows}</tbody></table></div>
@@ -118,7 +118,7 @@ function renderBacktest(box) {
   if (!PERF || PERF.status !== "ok") {
     const msg = PERF && PERF.msg ? PERF.msg : "回測資料尚未產生。";
     box.innerHTML = sb + wr + hb + `<div class="bt-intro">
-      <h3>📊 推薦成效回測</h3>
+      <h3>推薦成效回測</h3>
       <p>這裡會驗證一件最重要的事:<b>分數越高的股票,之後真的越會漲嗎?</b></p>
       <p class="bt-wait">${msg}</p>
       <p class="bt-note">原理:每天把推薦清單存檔,之後用真實股價算「推薦日後 5/10/20/60 個交易日」的收益率,
@@ -129,9 +129,9 @@ function renderBacktest(box) {
   }
   const W = PERF.windows || [5, 10, 20, 60];
   const G = [
-    { k: "strong", t: "強力建議", c: "#ef4444" },
-    { k: "mid", t: "可留意", c: "#d97706" },
-    { k: "watch", t: "觀察", c: "#64748b" },
+    { k: "strong", t: "強力建議", c: "var(--up)" },
+    { k: "mid", t: "可留意", c: "var(--gold)" },
+    { k: "watch", t: "觀察", c: "var(--tx3)" },
   ];
   const cell = (g, w) => {
     const d = (PERF.groups[g.k] || {})[w] || {};
@@ -181,7 +181,7 @@ function renderBacktest(box) {
 
   box.innerHTML = sb + wr + hb + `
     <div class="bt-head">
-      <div><h3>📊 推薦成效回測</h3>
+      <div><h3>推薦成效回測</h3>
         <p class="bt-meta">累積 ${PERF.snapshot_days} 個交易日 · 評估 ${PERF.recommendations_seen} 筆推薦 ·
         ${PERF.date_range ? PERF.date_range.join(" ~ ") : ""}</p></div>
     </div>

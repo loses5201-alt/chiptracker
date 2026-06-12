@@ -1,0 +1,120 @@
+/* ChipTracker 基底:design token + 版面骨架 + 導覽(深色為預設主題)
+   原則:色彩只留給漲跌與訊號,背景一律中性;字級收斂 5 級(18/15/13/12/11)。 */
+
+:root{
+  /* 中性色(深色預設) */
+  --bg:#0e1014;          /* 頁面底 */
+  --bg-soft:#13161c;     /* header / 底欄 */
+  --card:#181c23;        /* 卡片 */
+  --elev:#222834;        /* 卡內凹格、軌道 */
+  --line:#262c36;        /* 邊框 */
+  --tx:#e8ebf1;          /* 主文字 */
+  --tx2:#98a2b3;         /* 次要文字 */
+  --tx3:#62708a;         /* 輔助文字 */
+  /* 語意色:台股紅漲綠跌,只用在數據與訊號 */
+  --up:#f23645;
+  --dn:#21a378;
+  --acc:#7aa2ff;         /* 品牌/互動 */
+  --gold:#d9a23a;        /* 潛伏(金) */
+  --info:#38bdf8;        /* 中性走勢線 */
+  --r:12px;              /* 卡片圓角 */
+  --r-s:8px;             /* 小元件圓角 */
+  --shadow:0 8px 24px rgba(0,0,0,.35);
+}
+body.light{
+  --bg:#f3f4f7; --bg-soft:#ffffff; --card:#ffffff; --elev:#eef0f4; --line:#e3e6ec;
+  --tx:#1b2230; --tx2:#5b6577; --tx3:#9aa3b5;
+  --up:#d92637; --dn:#0c8f63; --acc:#3b66d9; --gold:#b27a10; --info:#0284c7;
+  --shadow:0 6px 18px rgba(25,35,60,.08);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--tx);
+  font-family:'Noto Sans TC',system-ui,sans-serif;
+  min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+.muted{color:var(--tx3)}
+.up{color:var(--up)}.down{color:var(--dn)}
+svg{vertical-align:middle}
+
+/* ── 頂部 header(一行化) ── */
+.header{background:var(--bg-soft);border-bottom:1px solid var(--line);padding:10px 16px;position:sticky;top:0;z-index:10}
+.header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{display:flex;align-items:center;gap:9px;min-width:0}
+.logo-icon{width:30px;height:30px;border-radius:8px;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0}
+.logo h1{font-size:15px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.logo .sub{font-size:11px;color:var(--tx3);margin-top:1px;white-space:nowrap}
+.header-right{display:flex;align-items:center;gap:8px;justify-content:flex-end;min-width:0}
+.theme-toggle{background:none;border:1px solid var(--line);color:var(--tx2);width:32px;height:32px;border-radius:8px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.theme-toggle svg{width:16px;height:16px}
+.theme-toggle:hover{color:var(--tx);border-color:var(--tx3)}
+
+/* 桌機頂部分頁 */
+.tabs{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end}
+.tab{padding:6px 11px;border:none;border-radius:7px;font-size:13px;cursor:pointer;background:none;color:var(--tx2);font-family:inherit;font-weight:500}
+.tab:hover{color:var(--tx);background:var(--elev)}
+.tab.active{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc);font-weight:700}
+
+.content{max-width:1100px;margin:0 auto;padding:14px 16px 60px}
+
+/* ── meta 列(候選數/交易日/資料源) ── */
+.meta-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:11px;color:var(--tx3);margin-bottom:12px}
+.meta-main b{color:var(--tx2);font-weight:600;font-family:'JetBrains Mono',monospace}
+.meta-src{display:flex;gap:4px}
+.src{padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;border:1px solid var(--line);color:var(--tx3)}
+.src.on{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 35%,transparent)}
+.meta-upd{margin-left:auto}
+
+/* ── 手機底部 tab bar(桌機隱藏) ── */
+.bottombar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
+  grid-template-columns:repeat(5,1fr);
+  background:color-mix(in srgb,var(--bg-soft) 92%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);
+  padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))}
+.bb-item{display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;cursor:pointer;padding:6px 2px;border-radius:10px;
+  color:var(--tx3);min-height:48px;-webkit-tap-highlight-color:transparent}
+.bb-icon{display:flex}
+.bb-icon svg{width:21px;height:21px}
+.bb-label{font-size:10.5px;font-weight:600;letter-spacing:.02em;font-family:inherit}
+.bb-item.active{color:var(--acc)}
+.bb-item:active{background:var(--elev)}
+
+/* ── 「更多」底部抽屜 ── */
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;z-index:70}
+.sheet.show{display:flex}
+.sheet-card{background:var(--card);border-radius:16px 16px 0 0;width:100%;
+  border-top:1px solid var(--line);
+  padding:8px 16px calc(18px + env(safe-area-inset-bottom,0px));animation:sheetUp .2s ease}
+@keyframes sheetUp{from{transform:translateY(40%);opacity:.4}to{transform:translateY(0);opacity:1}}
+.sheet-handle{width:38px;height:4px;border-radius:3px;background:var(--line);margin:4px auto 12px}
+.sheet-title{font-size:12px;font-weight:700;color:var(--tx3);margin-bottom:10px}
+.sheet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sheet-item{display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:var(--elev);border:1px solid transparent;border-radius:var(--r);padding:12px 4px;
+  color:var(--tx2);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.si-icon{display:flex}
+.si-icon svg{width:22px;height:22px}
+.si-label{font-size:11px;font-weight:600;font-family:inherit}
+.sheet-item.active{background:color-mix(in srgb,var(--acc) 14%,transparent);border-color:color-mix(in srgb,var(--acc) 35%,transparent);color:var(--acc)}
+
+/* ── 通用空狀態 / 頁尾備註 ── */
+.empty{text-align:center;color:var(--tx3);padding:60px 20px}
+.note{font-size:12px;color:var(--tx2);line-height:1.7;margin-top:16px;padding:12px 14px;background:var(--card);border-radius:var(--r);border:1px solid var(--line)}
+.note b{color:var(--tx)}
+
+/* ── 手機版全域 ── */
+@media(max-width:768px){
+  .bottombar{display:grid}
+  .header .tabs{display:none}              /* 頂部分頁讓位給底部 bar */
+  .logo .sub{display:none}                 /* 手機 header 收成一行 */
+  .content{padding:12px 12px calc(80px + env(safe-area-inset-bottom,0px))}
+  .meta-src{flex-wrap:nowrap;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .meta-src::-webkit-scrollbar{display:none}
+}
+@media(min-width:769px){
+  .sheet{display:none !important}          /* 桌機永不顯示抽屜 */
+}

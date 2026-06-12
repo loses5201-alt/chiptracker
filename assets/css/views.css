@@ -1,0 +1,176 @@
+/* ChipTracker 分頁視圖:大盤溫度計 / 題材 / 總覽 / 回測 / 期貨 / 潛伏 / 做空(全 token 化) */
+
+/* ── 大盤環境溫度計 ── */
+.pulse{display:flex;gap:16px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;margin-bottom:14px;border-left:3px solid var(--tx3)}
+.pulse.tailwind{border-left-color:var(--up)}
+.pulse.headwind{border-left-color:var(--dn)}
+.pulse-mood{display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:64px}
+.pm-tag{font-size:20px;font-weight:800;color:var(--tx2)}
+.pulse.tailwind .pm-tag{color:var(--up)}.pulse.headwind .pm-tag{color:var(--dn)}
+.pm-sub{font-size:11px;color:var(--tx3);margin-top:2px}
+.pulse-body{flex:1;display:flex;flex-direction:column;gap:7px;justify-content:center;min-width:0}
+.pb-bar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--elev)}
+.pb-up{background:var(--up)}.pb-fl{background:var(--tx3)}.pb-dn{background:var(--dn)}
+.pb-cap{font-size:12px;color:var(--tx2)}
+.pb-cap b{color:var(--tx)}
+.pulse-inst{font-size:12.5px;color:var(--tx2);display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.inst-item{display:flex;flex-direction:column;gap:1px;font-size:11.5px}
+.inst-item .ii-k{color:var(--tx3)}
+.inst-item b{font-family:'JetBrains Mono',monospace;font-size:14px}
+.inst-item .mini-spark{width:56px;height:18px;margin:1px 0}
+.inst-streak{font-size:10px;font-weight:700;padding:0 5px;border-radius:4px;align-self:flex-start}
+.inst-streak.up{background:color-mix(in srgb,var(--up) 13%,transparent);color:var(--up)}
+.inst-streak.down{background:color-mix(in srgb,var(--dn) 13%,transparent);color:var(--dn)}
+.pulse-margin{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--tx2);flex-wrap:wrap}
+.pulse-margin .pm-k{color:var(--tx3)}
+.pulse-margin .pm-v{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--tx)}
+.pm-trend{font-size:11.5px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.pm-trend.rise{color:var(--acc)}.pm-trend.fall{color:var(--info)}
+.pulse-topics{font-size:11.5px;color:var(--tx3)}
+.pulse-topic{display:inline-block;background:var(--elev);color:var(--tx2);border-radius:5px;padding:1px 8px;margin-left:5px;font-weight:600}
+.pulse-qe{font-size:11.5px;color:var(--gold);background:color-mix(in srgb,var(--gold) 11%,transparent);border-radius:6px;padding:3px 9px;margin-top:4px;display:inline-block;font-weight:600}
+@media(max-width:640px){.pulse{flex-direction:column;gap:10px}.pulse-mood{flex-direction:row;gap:8px;min-width:0}}
+
+/* ── 分頁分析摘要 ── */
+.list-analysis{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:var(--r);padding:12px 16px;margin-bottom:14px}
+.list-analysis.short{border-left-color:var(--dn)}
+.la-t{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:5px}
+.la-b{font-size:12.5px;color:var(--tx2);line-height:1.75}
+.la-c{color:var(--tx3);font-size:11px;margin-left:3px}
+
+/* ── 題材熱度 ── */
+.topic-wrap{display:flex;flex-direction:column;gap:12px}
+.topic-row{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px}
+.topic-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.topic-name{font-size:15px;font-weight:700}
+.topic-heat{font-size:12px;color:var(--gold);font-weight:600;font-family:'JetBrains Mono',monospace}
+.topic-track{height:6px;border-radius:4px;background:var(--elev);overflow:hidden}
+.topic-fill{display:block;height:100%;border-radius:4px;background:var(--gold)}
+.topic-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.t-chip{font-size:12px;padding:4px 11px;border-radius:7px;background:var(--elev);color:var(--tx2);cursor:pointer}
+.t-chip b{font-family:'JetBrains Mono',monospace}
+.t-chip:hover{color:var(--tx)}
+.t-chip.strong{background:color-mix(in srgb,var(--up) 12%,transparent);color:var(--up)}
+.t-chip.mid{background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--gold)}
+.no-stock{color:var(--tx3);font-size:11.5px}
+
+/* ── 總覽 KPI + 橫斷面 ── */
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:14px}
+.kpi .box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi .n{font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.kpi .l{font-size:11.5px;color:var(--tx3);margin-top:3px}
+.profile{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.prof-col{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px}
+.prof-h{font-size:12.5px;font-weight:700;color:var(--tx);margin-bottom:10px}
+.prof-topics{display:flex;flex-direction:column;gap:5px}
+.pt-row{display:flex;align-items:center;gap:8px;font-size:11.5px}
+.pt-name{width:88px;color:var(--tx2);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-track{flex:1;height:6px;background:var(--elev);border-radius:4px;overflow:hidden}
+.pt-fill{display:block;height:100%;background:var(--gold);border-radius:4px}
+.pt-c{width:24px;text-align:right;color:var(--tx2);font-weight:600}
+.prof-misc{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;color:var(--tx2)}
+.prof-misc b{color:var(--tx);font-family:'JetBrains Mono',monospace}
+@media(max-width:640px){.profile{grid-template-columns:1fr}}
+@media(max-width:768px){.kpi{grid-template-columns:repeat(2,1fr)}}
+
+/* ── 回測 ── */
+.bt-intro{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.bt-intro h3{font-size:16px;font-weight:700;margin-bottom:10px}
+.bt-intro p{color:var(--tx2);line-height:1.7;margin-bottom:10px;font-size:13px}
+.bt-intro .bt-wait{background:color-mix(in srgb,var(--gold) 9%,transparent);border-left:2px solid var(--gold);padding:9px 13px;border-radius:var(--r-s);color:var(--gold);font-weight:500}
+.bt-intro .bt-note{font-size:12px;color:var(--tx3)}
+.bt-head h3{font-size:16px;font-weight:700}
+.bt-meta{font-size:12px;color:var(--tx3);margin-top:4px}
+.bt-table td{vertical-align:top}
+.bt-grp{font-weight:600;text-align:left!important}
+.bt-grp .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.bt-ret{display:block;font-size:14.5px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.bt-sub{display:block;font-size:10.5px;color:var(--tx3);margin-top:2px}
+.bt-na{color:var(--tx3);text-align:center}
+.mono-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px}
+.mono-box{border-radius:var(--r-s);padding:12px;text-align:center;border:1px solid var(--line);background:var(--card)}
+.mono-box .mono-w{font-size:12px;color:var(--tx3);margin-bottom:4px}
+.mono-box .mono-t{font-size:13px;font-weight:700;color:var(--tx2)}
+.mono-box.ok .mono-t{color:var(--dn)}
+.mono-box.ok{border-color:color-mix(in srgb,var(--dn) 30%,transparent)}
+.mono-box.bad .mono-t{color:var(--up)}
+.mono-box.bad{border-color:color-mix(in srgb,var(--up) 30%,transparent)}
+
+/* ── 期貨風向 ── */
+.fut-intro,.stealth-intro,.short-intro{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 15px;font-size:12.5px;color:var(--tx2);margin-bottom:14px;line-height:1.65}
+.fut-intro b,.stealth-intro b,.short-intro b{color:var(--tx)}
+.stealth-intro{border-left:3px solid var(--gold)}
+.short-intro{border-left:3px solid var(--dn)}
+.fut-verdict{display:flex;align-items:center;gap:14px;border-radius:var(--r);padding:14px 16px;margin-bottom:13px;border:1px solid var(--line);background:var(--card)}
+.fut-verdict.bull{border-left:3px solid var(--up)}
+.fut-verdict.bear{border-left:3px solid var(--dn)}
+.fv-tag{font-size:23px;font-weight:800;letter-spacing:1px;color:var(--tx2)}
+.fut-verdict.bull .fv-tag{color:var(--up)}.fut-verdict.bear .fv-tag{color:var(--dn)}
+.fv-mid{flex:1}
+.fv-tally{font-size:14px;font-weight:600;color:var(--tx2);margin-bottom:6px}
+.fv-tally b{font-size:18px;font-variant-numeric:tabular-nums}
+.fv-sigs{display:flex;flex-wrap:wrap;gap:5px}
+.sig-chip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px}
+.sig-chip.up{background:color-mix(in srgb,var(--up) 12%,transparent);color:var(--up)}
+.sig-chip.down{background:color-mix(in srgb,var(--dn) 12%,transparent);color:var(--dn)}
+.fut-sec-t{font-size:12.5px;font-weight:700;color:var(--tx2);margin:15px 2px 8px}
+.fut-oi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:13px}
+.fut-oi,.fvs-card,.fut-ssf{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px}
+.fo-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.fo-k{font-size:12.5px;font-weight:600;color:var(--tx2)}
+.fo-tag{font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px}
+.fo-tag.up{background:color-mix(in srgb,var(--up) 12%,transparent);color:var(--up)}
+.fo-tag.down{background:color-mix(in srgb,var(--dn) 12%,transparent);color:var(--dn)}
+.fo-val{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace}
+.fo-foot{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+.fut-day{font-size:11px;color:var(--tx3)}.fut-day.up{color:var(--up)}.fut-day.down{color:var(--dn)}
+.fut-streak{font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px}
+.fut-streak.up{background:color-mix(in srgb,var(--up) 12%,transparent);color:var(--up)}
+.fut-streak.down{background:color-mix(in srgb,var(--dn) 12%,transparent);color:var(--dn)}
+.fut-pc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:5px 15px;margin-bottom:13px}
+.fpc-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.fpc-row:last-child{border-bottom:none}
+.fpc-k{font-size:12.5px;color:var(--tx2);flex:1}
+.fpc-v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace}
+.fpc-read{font-size:11.5px;color:var(--tx3)}
+.fut-vs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fvs-k{font-size:11.5px;color:var(--tx2);margin-bottom:6px;line-height:1.4}
+.fvs-v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace}
+.fvs-read{font-size:11.5px;color:var(--tx3);margin-top:3px}
+.fssf-inst{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--tx2)}
+.fssf-i b{font-variant-numeric:tabular-nums}
+.fssf-sub{font-size:11.5px;color:var(--tx3);margin:10px 0 6px}
+.ssf-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ssf-table td{padding:6px 4px;border-bottom:1px solid var(--line)}
+.ssf-table tr:last-child td{border-bottom:none}
+.sr-rank{color:var(--tx3);width:24px;font-weight:700}
+.ssf-code{color:var(--tx3);font-size:11px;margin-left:6px;font-weight:400}
+.sr-oi{text-align:right;font-variant-numeric:tabular-nums;color:var(--tx2)}
+.fut-note{background:var(--card);border:1px solid var(--line);border-left:2px solid var(--acc);border-radius:var(--r-s);padding:10px 13px;font-size:11.5px;color:var(--tx2);line-height:1.7}
+.fut-loading{display:inline-block;margin-top:6px;color:var(--acc);font-weight:600}
+@media(max-width:768px){.fut-oi-grid{grid-template-columns:1fr}.fut-vs{grid-template-columns:1fr}}
+
+/* ── 主力潛伏:埋伏進度條 + 已發動區 ── */
+.short-trade{margin-top:8px;font-size:11.5px;color:var(--tx2);background:var(--elev);border-radius:var(--r-s);padding:6px 10px;font-variant-numeric:tabular-nums}
+.stealth-prog{margin:10px 0 4px}
+.sp-track{position:relative;height:5px;border-radius:5px;background:var(--elev);overflow:visible}
+.sp-fill{height:100%;border-radius:5px;background:var(--gold)}
+.sp-dot{position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--card);transform:translate(-50%,-50%)}
+.stealth-prog.fired .sp-fill{background:var(--up)}
+.stealth-prog.fired .sp-dot{background:var(--up);animation:sp-pulse 1.4s infinite}
+@keyframes sp-pulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 50%,transparent)}50%{box-shadow:0 0 0 6px transparent}}
+.sp-foot{display:flex;justify-content:space-between;align-items:center;margin-top:5px}
+.sp-labels{display:flex;flex:1;justify-content:space-between;max-width:120px;font-size:10px;color:var(--tx3)}
+.sp-stage{font-size:11px;font-weight:700;color:var(--gold)}
+.stealth-prog.fired .sp-stage{color:var(--up)}
+.fired-wrap{background:var(--card);border:1px solid color-mix(in srgb,var(--up) 28%,var(--line));border-radius:var(--r);padding:13px 15px;margin-bottom:14px}
+.fired-head{font-size:14px;font-weight:700;color:var(--up);margin-bottom:9px}
+.fired-head small{font-weight:400;font-size:11.5px;color:var(--tx3);margin-left:6px}
+.fired-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:9px}
+.fired-card{background:var(--elev);border:1px solid var(--line);border-radius:var(--r-s);padding:9px 11px;cursor:pointer}
+.fired-card:hover{border-color:var(--tx3)}
+.fc-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.fc-name{font-size:13px;font-weight:600;color:var(--tx)}
+.fc-ret{font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.fc-ret.up{color:var(--up)}.fc-ret.down{color:var(--dn)}
+.fc-meta{font-size:10.5px;color:var(--tx3);line-height:1.5}

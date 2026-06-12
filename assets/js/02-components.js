@@ -13,20 +13,20 @@ function radar(s, size = 150, showLabels = true) {
   for (let g = 1; g <= 4; g++) {
     const rr = (R * g) / 4;
     const poly = SCORES.map((_, i) => ptAt(i, rr).map((v) => v.toFixed(1)).join(",")).join(" ");
-    grid += `<polygon points="${poly}" fill="none" stroke="#e2e8f0" stroke-width="1"/>`;
+    grid += `<polygon points="${poly}" fill="none" stroke="var(--line)" stroke-width="1"/>`;
   }
   // 軸線
   let axes = "";
   for (let i = 0; i < n; i++) {
     const [x, y] = ptAt(i, R);
-    axes += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`;
+    axes += `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
   }
   // 資料多邊形
   const dataPts = SCORES.map((d, i) => {
     const val = Math.max(0, Math.min(1, s[d.k] / d.max));
     return ptAt(i, R * val).map((v) => v.toFixed(1)).join(",");
   });
-  const poly = `<polygon points="${dataPts.join(" ")}" fill="url(#radarFill)" stroke="#6366f1" stroke-width="2" stroke-linejoin="round"/>`;
+  const poly = `<polygon points="${dataPts.join(" ")}" fill="url(#radarFill)" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round"/>`;
   // 頂點圓點(用各維顏色)
   let dots = "";
   SCORES.forEach((d, i) => {
@@ -40,13 +40,16 @@ function radar(s, size = 150, showLabels = true) {
     SCORES.forEach((d, i) => {
       const [x, y] = ptAt(i, R + 14);
       const anchor = Math.abs(x - cx) < 6 ? "middle" : x > cx ? "start" : "end";
-      labels += `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#64748b" font-weight="500">${d.label}</text>`;
+      labels += `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="var(--tx2)" font-weight="500">${d.label}</text>`;
     });
   }
   return `<svg viewBox="0 0 ${vbW} ${size}" class="radar" width="${vbW}" height="${size}">
-    <defs><radialGradient id="radarFill"><stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/><stop offset="100%" stop-color="#818cf8" stop-opacity="0.12"/></radialGradient></defs>
+    <defs><radialGradient id="radarFill"><stop offset="0%" stop-color="var(--acc)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--acc)" stop-opacity="0.08"/></radialGradient></defs>
     ${grid}${axes}${poly}${dots}${labels}</svg>`;
 }
+
+// 分數顯示統一取整(後端偶有浮點殘差,如 80.60000000000001)
+function fmtScore(v) { return v != null ? Math.round(v) : "—"; }
 
 // 市場別標籤(上市/上櫃)。舊資料無 mkt 欄位時不顯示,避免誤標。
 function mktTag(mkt) {
@@ -59,7 +62,7 @@ function card(s, idx) {
   const badges = (s.reason || []).slice(0, 3).map((r) => `<span class="badge">${r}</span>`).join("");
   const topicTag = s.topic && s.topic !== "—" ? `<span class="badge topic">${s.topic}</span>` : "";
   const newsLine = s.news && s.news.length
-    ? `<div class="card-news">📰 ${s.news[0]}</div>` : "";
+    ? `<div class="card-news">${s.news[0]}</div>` : "";
   const chg = s.yoy != null ? s.yoy : null;
   const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
   const streakTag = ch && Math.abs(ch.inst_buy_streak) >= 3 ? streakBadge(ch.inst_buy_streak) : "";
@@ -71,13 +74,11 @@ function card(s, idx) {
         <div class="px-row"><span class="stock-px">${s.close || "—"}</span> ${topicTag}</div>
       </div>
       <div class="ct-right">
-        <div class="score-ring ${s.rec}"><span>${s.score}</span><small>分</small></div>
+        <div class="score-ring ${s.rec}"><span>${fmtScore(s.score)}</span><small>分</small></div>
         <div class="pill ${s.rec}">${REC_TEXT[s.rec]}</div>
       </div>
     </div>
-    <div class="card-mid">
-      <div class="radar-wrap">${radar(s, 158)}</div>
-    </div>
+    ${miniBars(s)}
     <div class="mid-stats">
       ${statBox("月營收", s.yoy != null ? (s.yoy >= 0 ? "+" : "") + s.yoy + "%" : "—", s.yoy != null ? s.yoy >= 0 : null)}
       ${statBox("海外", s.ov != null ? (s.ov >= 0 ? "+" : "") + s.ov + "%" : "—", s.ov != null ? s.ov >= 0 : null)}
@@ -90,6 +91,16 @@ function card(s, idx) {
   </div>`;
 }
 
+// 六面向迷你橫條:卡片上取代雷達圖(橫條掃讀更快,雷達留在詳情 modal)
+function miniBars(s) {
+  return `<div class="mini-bars">${SCORES.map((d) => {
+    const pct = Math.round(Math.max(0, Math.min(1, s[d.k] / d.max)) * 100);
+    return `<div class="mb-row"><span class="mb-k">${d.label}</span>
+      <span class="mb-track"><span class="mb-fill" style="width:${pct}%;background:${d.color}"></span></span>
+      <span class="mb-v">${s[d.k]}/${d.max}</span></div>`;
+  }).join("")}</div>`;
+}
+
 // 卡片指標小格(2×2,label 左 + 值右,不擠不換行)
 function statBox(k, v, positive) {
   const cls = positive === null ? "" : positive ? "up" : "down";
@@ -97,7 +108,7 @@ function statBox(k, v, positive) {
 }
 
 function recColor(rec) {
-  return { strong: "#ef4444", mid: "#d97706", watch: "#64748b" }[rec] || "#64748b";
+  return { strong: "var(--up)", mid: "var(--gold)", watch: "var(--tx3)" }[rec] || "var(--tx3)";
 }
 
 // ── K 線走勢(純 SVG 折線)──
@@ -110,7 +121,7 @@ function sparkline(closes, w = 540, h = 180) {
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   const up = closes[closes.length - 1] >= closes[0];
-  const color = up ? "#ef4444" : "#22c55e";
+  const color = up ? "var(--up)" : "var(--dn)";
   const area = `${pad},${h - pad} ` + pts.join(" ") + ` ${w - pad},${h - pad}`;
   const last = pts[pts.length - 1].split(",");
   return `<svg viewBox="0 0 ${w} ${h}" class="spark" preserveAspectRatio="none">
@@ -160,14 +171,14 @@ function analyzeStock(s) {
   if (s.s6 / 15 >= 0.7) parts.push(`技術動能轉強(RSI ${s.rsi})`);
   if (s.s2 / 8 >= 0.7) parts.push("融資券籌碼配合");
   const recTxt = { strong: "強力建議", mid: "可留意", watch: "觀察" }[s.rec] || "";
-  const lead = `<b>${s.n}</b>(${s.c})以 <b>${s.score} 分</b>列為「${recTxt}」,主要因為:`;
+  const lead = `<b>${s.n}</b>(${s.c})以 <b>${fmtScore(s.score)} 分</b>列為「${recTxt}」,主要因為:`;
   const body = parts.length ? parts.join("、") + "。" : "六面向分數綜合達標。";
   const risks = [];
   if (s.pos >= 85) risks.push(`位階偏高(區間位置 ${s.pos}),宜等拉回或嚴設停損`);
   if (typeof s.rsi === "number" && s.rsi >= 80) risks.push(`RSI ${s.rsi} 過熱`);
   if (s.s1 / 22 < 0.4) risks.push("法人參與度偏低");
   if (s.yoy != null && s.yoy < 0) risks.push(`月營收年減 ${s.yoy}%`);
-  const riskTxt = risks.length ? `<div class="why-risk">⚠️ 留意:${risks.join("、")}。</div>` : "";
+  const riskTxt = risks.length ? `<div class="why-risk">留意:${risks.join("、")}。</div>` : "";
   return `<div class="why">${lead}${body}${riskTxt}</div>`;
 }
 
@@ -176,7 +187,7 @@ function openDetail(code) {
   if (!s) return;
   const topicTag = s.topic && s.topic !== "—" ? `<span class="badge topic">${s.topic}</span>` : "";
   const newsBlock = s.news && s.news.length
-    ? `<div class="m-section">📰 ${s.topic} 相關新聞(近期)</div>
+    ? `<div class="m-section">${s.topic} 相關新聞(近期)</div>
        <div class="news-list">${s.news.map((t) => `<div class="news-item">${t}</div>`).join("")}</div>`
     : "";
   const ch = CHIPS && CHIPS[s.c] ? CHIPS[s.c] : null;
@@ -189,7 +200,7 @@ function openDetail(code) {
     const note = below ? `跌破法人成本 ${diff.toFixed(1)}%` : `高於成本 +${diff.toFixed(1)}%`;
     costRow = `<div class="ct-row"><span class="ct-k">法人成本</span>
       <b style="font-family:'JetBrains Mono',monospace;font-size:14px">${ch.cost}</b>
-      <span class="ct-note" style="${below ? "color:#f59e0b;font-weight:600" : ""}">${note}</span></div>`;
+      <span class="ct-note" style="${below ? "color:var(--gold);font-weight:600" : ""}">${note}</span></div>`;
   }
   const chipBlock = ch && ch.inst && ch.inst.length >= 2
     ? `<div class="m-section">籌碼趨勢(近 ${ch.inst.length} 交易日,法人單位:股)</div>
@@ -218,7 +229,7 @@ function openDetail(code) {
     <div class="m-head">
       <div>
         <div class="m-name">${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)} ${topicTag}</div>
-        <div class="m-px">${s.close || "—"} <span class="pill ${s.rec}">${REC_TEXT[s.rec]} ${s.score}分</span></div>
+        <div class="m-px">${s.close || "—"} <span class="pill ${s.rec}">${REC_TEXT[s.rec]} ${fmtScore(s.score)}分</span></div>
       </div>
       <button class="m-close" id="m-close">✕</button>
     </div>

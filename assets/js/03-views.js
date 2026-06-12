@@ -6,17 +6,17 @@ function renderTopic(box) {
   const bars = ranked.map(([name, h]) => {
     const stocks = STOCKS.filter((s) => s.topic === name);
     const chips = stocks.slice(0, 8).map((s) =>
-      `<span class="t-chip ${s.rec}" data-code="${s.c}">${s.n} <b>${s.score}</b></span>`).join("");
+      `<span class="t-chip ${s.rec}" data-code="${s.c}">${s.n} <b>${fmtScore(s.score)}</b></span>`).join("");
     return `<div class="topic-row">
       <div class="topic-head"><span class="topic-name">${name}</span>
-        <span class="topic-heat">🔥 ${h} 則新聞</span></div>
+        <span class="topic-heat">${h} 則新聞</span></div>
       <div class="topic-track"><span class="topic-fill" style="width:${(h / maxHeat) * 100}%"></span></div>
       <div class="topic-chips">${chips || '<span class="no-stock">候選股中無此題材</span>'}</div>
     </div>`;
   }).join("");
   const totalNews = ranked.reduce((a, r) => a + r[1], 0);
   const hot = ranked[0];
-  const analysis = hot ? `<div class="list-analysis"><div class="la-t">📊 題材熱度分析</div><div class="la-b">今日最熱題材 <b class="up">${hot[0]}</b>(🔥 ${hot[1]} 則新聞、推薦股 ${STOCKS.filter((s) => s.topic === hot[0]).length} 檔),全題材近 3 日共 <b>${totalNews}</b> 則新聞。題材熱度高=市場資金正聚焦,但<b>追題材要搭配法人買超</b>,別追在熱度退燒的題材尾聲。</div></div>` : "";
+  const analysis = hot ? `<div class="list-analysis"><div class="la-t">題材熱度分析</div><div class="la-b">今日最熱題材 <b class="up">${hot[0]}</b>(${hot[1]} 則新聞、推薦股 ${STOCKS.filter((s) => s.topic === hot[0]).length} 檔),全題材近 3 日共 <b>${totalNews}</b> 則新聞。題材熱度高=市場資金正聚焦,但<b>追題材要搭配法人買超</b>,別追在熱度退燒的題材尾聲。</div></div>` : "";
   box.innerHTML = analysis + `<div class="topic-wrap">${bars}</div>` + footNote();
   box.querySelectorAll(".t-chip").forEach((el) =>
     el.addEventListener("click", () => openDetail(el.dataset.code))
@@ -60,15 +60,15 @@ function renderOverview(box) {
   const mid = STOCKS.filter((s) => s.rec === "mid").length;
   const kpi = `<div class="kpi">
     <div class="box"><div class="n">${META.universe || 0}</div><div class="l">掃描候選</div></div>
-    <div class="box"><div class="n" style="color:#ef4444">${strong}</div><div class="l">強力建議</div></div>
-    <div class="box"><div class="n" style="color:#d97706">${mid}</div><div class="l">可留意</div></div>
+    <div class="box"><div class="n" style="color:var(--up)">${strong}</div><div class="l">強力建議</div></div>
+    <div class="box"><div class="n" style="color:var(--gold)">${mid}</div><div class="l">可留意</div></div>
     <div class="box"><div class="n">${META.yahoo_ok || 0}</div><div class="l">技術面回補</div></div>
   </div>`;
   const rows = STOCKS.map((s, i) => `<tr data-code="${s.c}">
     <td class="rank">${i + 1}</td>
     <td>${s.n}<span class="stock-code">${s.c}</span>${mktTag(s.mkt)}</td>
     <td>${s.close || "—"}</td>
-    <td><span class="score-pill ${s.rec}">${s.score}</span></td>
+    <td><span class="score-pill ${s.rec}">${fmtScore(s.score)}</span></td>
     <td>${s.s1}</td>
     <td class="${s.yoy >= 0 ? "up" : "down"}">${s.yoy != null ? s.yoy + "%" : "—"}</td>
     <td>${s.topic && s.topic !== "—" ? s.topic : "—"}</td></tr>`).join("");
@@ -90,7 +90,7 @@ function miniSpark(vals, w = 116, h = 26) {
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
   const up = vals[vals.length - 1] >= vals[0];
-  const c = up ? "#8b5cf6" : "#0ea5e9";
+  const c = up ? "var(--acc)" : "var(--info)";
   return `<svg viewBox="0 0 ${w} ${h}" class="mini-spark" preserveAspectRatio="none"><polyline points="${pts.join(" ")}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
@@ -114,7 +114,7 @@ function marketPulse() {
   const cls = (v) => (v >= 0 ? "up" : "down");
   const total = p.advancers + p.decliners + p.unchanged || 1;
   const chips = (p.hot_topics || []).map((t) =>
-    `<span class="pulse-topic">${t.name}${t.heat ? ` 🔥${t.heat}` : ""}</span>`).join("");
+    `<span class="pulse-topic">${t.name}${t.heat ? ` ${t.heat}` : ""}</span>`).join("");
 
   // 融資餘額:優先用回填的週趨勢(總量+逐日走勢),沒有才退回當日變化
   // 三大法人:當日金額 + 近10日走勢 + 連買/連賣天數(BFI82U 回填)
@@ -163,7 +163,7 @@ function marketPulse() {
       </div>
       ${marginRow}
       <div class="pulse-topics">強勢題材 ${chips}</div>
-      ${META.quarter_end ? `<div class="pulse-qe">📅 季底投信作帳期 — 留意投信連買的中型股</div>` : ""}
+      ${META.quarter_end ? `<div class="pulse-qe">季底投信作帳期 — 留意投信連買的中型股</div>` : ""}
     </div>
   </div>`;
 }

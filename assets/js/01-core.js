@@ -3,29 +3,49 @@
 // 職責:讀 data/*.json → 依分頁渲染 + 點卡片看詳情。所有運算都在後端做完。
 
 const SCORES = [
-  { k: "s1", label: "法人", max: 22, color: "#3b82f6" },
-  { k: "s2", label: "融資", max: 8, color: "#8b5cf6" },
-  { k: "s3", label: "基本面", max: 20, color: "#22c55e" },
-  { k: "s4", label: "國際", max: 20, color: "#06b6d4" },
-  { k: "s5", label: "題材", max: 15, color: "#f59e0b" },
-  { k: "s6", label: "動能", max: 15, color: "#ec4899" },
+  { k: "s1", label: "法人", max: 22, color: "#5b8def" },
+  { k: "s2", label: "融資", max: 8, color: "#9b7ddf" },
+  { k: "s3", label: "基本面", max: 20, color: "#2fae7d" },
+  { k: "s4", label: "國際", max: 20, color: "#3fb6c9" },
+  { k: "s5", label: "題材", max: 15, color: "#d9a23a" },
+  { k: "s6", label: "動能", max: 15, color: "#d4669a" },
 ];
 const REC_TEXT = { strong: "強力建議", mid: "可留意", watch: "觀察" };
 const SHORT_TEXT = { strong: "強烈做空", mid: "留意做空", watch: "觀察" };
 const STEALTH_TEXT = { strong: "強力潛伏", mid: "潛伏中", watch: "觀察" };
 const TABS = [
-  { k: "stealth", t: "主力潛伏", icon: "🎯", short: "潛伏" },
-  { k: "entry", t: "進場建議", icon: "📈", short: "進場" },
-  { k: "futures", t: "期貨風向", icon: "🧭", short: "期貨" },
-  { k: "foreign", t: "法人動向", icon: "🏦", short: "法人" },
-  { k: "fund", t: "基本面", icon: "📋", short: "基本面" },
-  { k: "topic", t: "題材熱度", icon: "🔥", short: "題材" },
-  { k: "intl", t: "國際連動", icon: "🌐", short: "國際" },
-  { k: "backtest", t: "回測", icon: "🧪", short: "回測" },
-  { k: "overview", t: "總覽", icon: "📊", short: "總覽" },
-  { k: "short", t: "做空標的", icon: "📉", short: "做空" },
-  { k: "watch", t: "查詢/自選", icon: "⭐", short: "自選" },
+  { k: "stealth", t: "主力潛伏", short: "潛伏" },
+  { k: "entry", t: "進場建議", short: "進場" },
+  { k: "futures", t: "期貨風向", short: "期貨" },
+  { k: "foreign", t: "法人動向", short: "法人" },
+  { k: "fund", t: "基本面", short: "基本面" },
+  { k: "topic", t: "題材熱度", short: "題材" },
+  { k: "intl", t: "國際連動", short: "國際" },
+  { k: "backtest", t: "回測", short: "回測" },
+  { k: "overview", t: "總覽", short: "總覽" },
+  { k: "short", t: "做空標的", short: "做空" },
+  { k: "watch", t: "查詢/自選", short: "自選" },
 ];
+// 導覽圖示:內嵌 SVG 線稿(取代 emoji,跟著 currentColor 換色,維持零依賴)
+const ICONS = {
+  stealth: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
+  entry: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
+  futures: '<circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 13.5 13.5 8.5 15.5 10.5 10.5" fill="currentColor" stroke="none"/>',
+  foreign: '<path d="M3 9l9-5 9 5"/><path d="M5 10v8M9.7 10v8M14.3 10v8M19 10v8"/><path d="M3 20h18"/>',
+  fund: '<path d="M7 3h7l4 4v14H7z"/><path d="M10 12h5M10 16h5"/>',
+  topic: '<path d="M12 3c4 4 6 6.5 6 10a6 6 0 0 1-12 0c0-3.5 2-6 6-10z"/>',
+  intl: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
+  backtest: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/>',
+  overview: '<path d="M4 20h16M7 20v-7M12 20V5M17 20v-10"/>',
+  short: '<polyline points="3 7 9 13 13 9 21 17"/><polyline points="15 17 21 17 21 11"/>',
+  watch: '<path d="M12 3.5l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.9l6-.9z"/>',
+  more: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  moon: '<path d="M20 13A8 8 0 1 1 11 4a6.5 6.5 0 0 0 9 9z"/>',
+};
+function icon(k) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k] || ""}</svg>`;
+}
 // 手機底部 tab bar 只放最常用 4 個(拇指可及),其餘收進「更多」抽屜;桌機維持頂部完整分頁
 const PRIMARY = ["stealth", "entry", "futures", "watch"];
 
@@ -117,10 +137,10 @@ function renderBottomBar() {
   if (!bar) return;
   const inMore = !PRIMARY.includes(view);   // 目前頁面在「更多」群 → 高亮更多鈕
   const btn = (t) => `<button class="bb-item ${t.k === view ? "active" : ""}" data-k="${t.k}">
-    <span class="bb-icon">${t.icon}</span><span class="bb-label">${t.short}</span></button>`;
+    <span class="bb-icon">${icon(t.k)}</span><span class="bb-label">${t.short}</span></button>`;
   bar.innerHTML = PRIMARY.map((k) => btn(TABS.find((t) => t.k === k))).join("") +
     `<button class="bb-item ${inMore ? "active" : ""}" id="bb-more">
-      <span class="bb-icon">☰</span><span class="bb-label">更多</span></button>`;
+      <span class="bb-icon">${icon("more")}</span><span class="bb-label">更多</span></button>`;
   bar.querySelectorAll(".bb-item[data-k]").forEach((el) =>
     el.addEventListener("click", () => switchView(el.dataset.k)));
   document.getElementById("bb-more").addEventListener("click", openMoreSheet);
@@ -134,7 +154,7 @@ function openMoreSheet() {
     `<div class="sheet-handle"></div><div class="sheet-title">更多功能</div>
      <div class="sheet-grid">${items.map((t) =>
       `<button class="sheet-item ${t.k === view ? "active" : ""}" data-k="${t.k}">
-        <span class="si-icon">${t.icon}</span><span class="si-label">${t.t}</span></button>`).join("")}</div>`;
+        <span class="si-icon">${icon(t.k)}</span><span class="si-label">${t.t}</span></button>`).join("")}</div>`;
   sheet.classList.add("show");
   sheet.querySelectorAll(".sheet-item").forEach((el) =>
     el.addEventListener("click", () => switchView(el.dataset.k)));
@@ -192,7 +212,7 @@ function listAnalysis(view, list) {
     title = "國際連動分析";
     body = `關聯國際題材的 <b>${list.length}</b> 檔分布在 <b>${ranked.length}</b> 個題材。海外同業動能最強題材 <b class="up">${t0[0]}</b>(海外近5日均 ${t0[1] >= 0 ? "+" : ""}${t0[1].toFixed(1)}%、${t0[2]} 檔)。海外同業走強常領先台股同題材個股,題材輪動看這裡。`;
   } else return "";
-  return `<div class="list-analysis"><div class="la-t">📊 ${title}</div><div class="la-b">${body}</div></div>`;
+  return `<div class="list-analysis"><div class="la-t">${title}</div><div class="la-b">${body}</div></div>`;
 }
 
 // ── 六面向雷達圖(純 SVG,無外部相依)──
