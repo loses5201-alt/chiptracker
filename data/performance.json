@@ -1,12 +1,12 @@
 {
  "status": "ok",
- "generated_at": "2026-06-12T20:43:38+08:00",
- "snapshot_days": 11,
+ "generated_at": "2026-06-15T23:30:01+08:00",
+ "snapshot_days": 12,
  "date_range": [
   "20260529",
-  "20260612"
+  "20260615"
  ],
- "recommendations_seen": 440,
+ "recommendations_seen": 480,
  "windows": [
   5,
   10,
@@ -18,16 +18,16 @@
  "groups": {
   "strong": {
    "5": {
-    "avg": -1.63,
-    "win_rate": 40.0,
-    "alpha": 1.64,
-    "n": 240
+    "avg": -0.96,
+    "win_rate": 43.6,
+    "alpha": 1.62,
+    "n": 264
    },
    "10": {
-    "avg": -0.5,
-    "win_rate": 42.5,
-    "alpha": 0.76,
-    "n": 40
+    "avg": 0.26,
+    "win_rate": 45.0,
+    "alpha": 0.83,
+    "n": 80
    },
    "20": {
     "avg": null,
@@ -44,10 +44,10 @@
   },
   "mid": {
    "5": {
-    "avg": null,
-    "win_rate": null,
-    "alpha": null,
-    "n": 0
+    "avg": 3.42,
+    "win_rate": 68.8,
+    "alpha": -0.93,
+    "n": 16
    },
    "10": {
     "avg": null,
@@ -98,14 +98,14 @@
  "by_market": {
   "twse": {
    "5": {
-    "avg": -2.48,
-    "win_rate": 36.7,
-    "n": 196
+    "avg": -1.24,
+    "win_rate": 43.2,
+    "n": 236
    },
    "10": {
-    "avg": null,
-    "win_rate": null,
-    "n": 0
+    "avg": 1.47,
+    "win_rate": 48.7,
+    "n": 39
    },
    "20": {
     "avg": null,
@@ -125,9 +125,9 @@
     "n": 4
    },
    "10": {
-    "avg": null,
-    "win_rate": null,
-    "n": 0
+    "avg": -16.25,
+    "win_rate": 0.0,
+    "n": 1
    },
    "20": {
     "avg": null,
@@ -143,20 +143,20 @@
  },
  "factor_power": {
   "法人": {
-   "5": 6.55,
+   "5": 5.29,
    "10": null,
    "20": null,
    "60": null
   },
   "融資": {
-   "5": 2.31,
-   "10": null,
+   "5": 2.36,
+   "10": 5.22,
    "20": null,
    "60": null
   },
   "基本面": {
-   "5": 1.8,
-   "10": null,
+   "5": 1.78,
+   "10": 4.97,
    "20": null,
    "60": null
   },
@@ -173,8 +173,8 @@
    "60": null
   },
   "技術": {
-   "5": 2.91,
-   "10": null,
+   "5": 2.31,
+   "10": 0.55,
    "20": null,
    "60": null
   }
