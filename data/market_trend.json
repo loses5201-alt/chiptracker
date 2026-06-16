@@ -1,5 +1,5 @@
 {
- "updated": "2026-06-16T02:09:29+08:00",
+ "updated": "2026-06-16T22:31:11+08:00",
  "margin": [
   {
    "date": "20260602",
@@ -64,18 +64,6 @@
  ],
  "inst": [
   {
-   "date": "20260601",
-   "foreign_yi": 368.2,
-   "trust_yi": 77.6,
-   "dealer_yi": -65.1
-  },
-  {
-   "date": "20260602",
-   "foreign_yi": 108.4,
-   "trust_yi": 28.2,
-   "dealer_yi": -157.7
-  },
-  {
    "date": "20260603",
    "foreign_yi": 434.0,
    "trust_yi": 55.5,
@@ -96,8 +84,14 @@
   {
    "date": "20260608",
    "foreign_yi": -938.5,
-   "trust_yi": 90.7,
+   "trust_yi": 87.8,
    "dealer_yi": -491.5
+  },
+  {
+   "date": "20260609",
+   "foreign_yi": -917.3,
+   "trust_yi": 232.8,
+   "dealer_yi": -66.9
   },
   {
    "date": "20260610",
@@ -122,6 +116,12 @@
    "foreign_yi": 465.3,
    "trust_yi": 64.4,
    "dealer_yi": 125.2
+  },
+  {
+   "date": "20260616",
+   "foreign_yi": 408.0,
+   "trust_yi": 118.2,
+   "dealer_yi": 60.9
   }
  ]
 }
