@@ -1,12 +1,12 @@
 {
  "status": "ok",
- "generated_at": "2026-06-24T23:47:05+08:00",
- "snapshot_days": 18,
+ "generated_at": "2026-06-26T00:06:04+08:00",
+ "snapshot_days": 19,
  "date_range": [
   "20260529",
-  "20260624"
+  "20260625"
  ],
- "recommendations_seen": 720,
+ "recommendations_seen": 760,
  "windows": [
   5,
   10,
