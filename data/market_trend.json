@@ -1,6 +1,12 @@
 {
- "updated": "2026-06-30T00:47:35+08:00",
+ "updated": "2026-06-30T19:58:58+08:00",
  "margin": [
+  {
+   "date": "20260612",
+   "margin_lots": 9088829.0,
+   "short_lots": 224946.0,
+   "margin_yi": 5570.3
+  },
   {
    "date": "20260615",
    "margin_lots": 9195123.0,
@@ -54,12 +60,6 @@
    "margin_lots": 9328374.0,
    "short_lots": 203932.0,
    "margin_yi": 5909.3
-  },
-  {
-   "date": "20260629",
-   "margin_lots": 9386112.0,
-   "short_lots": 205287.0,
-   "margin_yi": 5942.3
   }
  ],
  "inst": [
