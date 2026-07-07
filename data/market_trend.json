@@ -1,5 +1,5 @@
 {
- "updated": "2026-07-07T00:38:01+08:00",
+ "updated": "2026-07-07T20:14:44+08:00",
  "margin": [
   {
    "date": "20260623",
@@ -64,12 +64,6 @@
  ],
  "inst": [
   {
-   "date": "20260623",
-   "foreign_yi": -385.9,
-   "trust_yi": 72.4,
-   "dealer_yi": -169.8
-  },
-  {
    "date": "20260624",
    "foreign_yi": -1774.0,
    "trust_yi": 33.0,
@@ -84,7 +78,7 @@
   {
    "date": "20260626",
    "foreign_yi": -1431.9,
-   "trust_yi": 101.0,
+   "trust_yi": 84.0,
    "dealer_yi": -707.3
   },
   {
@@ -122,6 +116,12 @@
    "foreign_yi": -255.0,
    "trust_yi": 71.6,
    "dealer_yi": -97.2
+  },
+  {
+   "date": "20260707",
+   "foreign_yi": -547.3,
+   "trust_yi": 96.8,
+   "dealer_yi": -487.3
   }
  ]
 }
