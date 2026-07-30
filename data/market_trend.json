@@ -1,12 +1,6 @@
 {
- "updated": "2026-07-29T19:40:03+08:00",
+ "updated": "2026-07-30T19:28:34+08:00",
  "margin": [
-  {
-   "date": "20260715",
-   "margin_lots": 9519727.0,
-   "short_lots": 173131.0,
-   "margin_yi": 6153.7
-  },
   {
    "date": "20260716",
    "margin_lots": 9513579.0,
@@ -60,15 +54,15 @@
    "margin_lots": 9096008.0,
    "short_lots": 219259.0,
    "margin_yi": 5455.3
+  },
+  {
+   "date": "20260729",
+   "margin_lots": 8764868.0,
+   "short_lots": 217485.0,
+   "margin_yi": 5070.1
   }
  ],
  "inst": [
-  {
-   "date": "20260716",
-   "foreign_yi": -483.3,
-   "trust_yi": 86.5,
-   "dealer_yi": -33.6
-  },
   {
    "date": "20260717",
    "foreign_yi": -1883.1,
@@ -120,8 +114,14 @@
   {
    "date": "20260729",
    "foreign_yi": -222.5,
-   "trust_yi": 90.9,
+   "trust_yi": 57.1,
    "dealer_yi": -186.0
+  },
+  {
+   "date": "20260730",
+   "foreign_yi": -483.1,
+   "trust_yi": 126.6,
+   "dealer_yi": -152.3
   }
  ]
 }
