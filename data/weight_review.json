@@ -1,61 +1,61 @@
 {
  "status": "ok",
- "generated_at": "2026-09-09T21:52:10+08:00",
+ "generated_at": "2026-09-10T01:17:01+08:00",
  "sample": 40,
  "factors": [
   {
    "key": "s1",
    "name": "法人",
    "weight": 22,
-   "mean": 20.44,
-   "fill_pct": 92.9,
-   "discrim": 13.5,
-   "corr_total": -0.046
+   "mean": 20.29,
+   "fill_pct": 92.2,
+   "discrim": 13.4,
+   "corr_total": -0.2
   },
   {
    "key": "s2",
    "name": "融資",
    "weight": 8,
-   "mean": 5.4,
-   "fill_pct": 67.5,
-   "discrim": 24.5,
-   "corr_total": 0.128
+   "mean": 5.28,
+   "fill_pct": 65.9,
+   "discrim": 24.0,
+   "corr_total": 0.291
   },
   {
    "key": "s3",
    "name": "基本面",
    "weight": 20,
-   "mean": 15.41,
-   "fill_pct": 77.1,
-   "discrim": 17.8,
-   "corr_total": 0.268
+   "mean": 15.73,
+   "fill_pct": 78.7,
+   "discrim": 17.2,
+   "corr_total": 0.283
   },
   {
    "key": "s4",
    "name": "國際",
    "weight": 20,
-   "mean": 17.23,
-   "fill_pct": 86.1,
-   "discrim": 22.5,
-   "corr_total": 0.497
+   "mean": 15.95,
+   "fill_pct": 79.8,
+   "discrim": 24.4,
+   "corr_total": 0.543
   },
   {
    "key": "s5",
    "name": "題材",
    "weight": 15,
-   "mean": 10.63,
-   "fill_pct": 70.9,
-   "discrim": 24.8,
+   "mean": 10.32,
+   "fill_pct": 68.8,
+   "discrim": 25.2,
    "corr_total": 0.561
   },
   {
    "key": "s6",
    "name": "動能",
    "weight": 15,
-   "mean": 9.93,
-   "fill_pct": 66.2,
-   "discrim": 24.4,
-   "corr_total": 0.082
+   "mean": 8.75,
+   "fill_pct": 58.3,
+   "discrim": 26.2,
+   "corr_total": -0.011
   }
  ],
  "note": "基於今日入選股。fill%=平均佔滿分比、區分度=分數離散程度(高=在拉開排名)、corr=與總分相關。權重是否該調,需對照回測『面向預測力』累積後判斷:高權重但低預測力→考慮降;低權重但高預測力→考慮升。"
