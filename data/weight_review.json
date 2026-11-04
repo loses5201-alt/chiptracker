@@ -1,6 +1,6 @@
 {
  "status": "ok",
- "generated_at": "2026-11-05T01:27:42+08:00",
+ "generated_at": "2026-11-05T04:35:38+08:00",
  "sample": 40,
  "factors": [
   {
@@ -10,7 +10,7 @@
    "mean": 21.5,
    "fill_pct": 97.7,
    "discrim": 5.1,
-   "corr_total": 0.136
+   "corr_total": 0.108
   },
   {
    "key": "s2",
@@ -19,7 +19,7 @@
    "mean": 5.05,
    "fill_pct": 63.1,
    "discrim": 22.4,
-   "corr_total": 0.018
+   "corr_total": 0.022
   },
   {
    "key": "s3",
@@ -28,25 +28,25 @@
    "mean": 16.27,
    "fill_pct": 81.3,
    "discrim": 19.7,
-   "corr_total": 0.0
+   "corr_total": -0.063
   },
   {
    "key": "s4",
    "name": "國際",
    "weight": 20,
-   "mean": 9.75,
-   "fill_pct": 48.8,
-   "discrim": 17.2,
-   "corr_total": 0.028
+   "mean": 9.95,
+   "fill_pct": 49.7,
+   "discrim": 18.3,
+   "corr_total": 0.11
   },
   {
    "key": "s5",
    "name": "題材",
    "weight": 15,
-   "mean": 6.17,
-   "fill_pct": 41.1,
-   "discrim": 3.0,
-   "corr_total": 0.383
+   "mean": 6.13,
+   "fill_pct": 40.9,
+   "discrim": 2.4,
+   "corr_total": 0.342
   },
   {
    "key": "s6",
@@ -55,7 +55,7 @@
    "mean": 6.55,
    "fill_pct": 43.7,
    "discrim": 30.3,
-   "corr_total": 0.722
+   "corr_total": 0.732
   }
  ],
  "note": "基於今日入選股。fill%=平均佔滿分比、區分度=分數離散程度(高=在拉開排名)、corr=與總分相關。權重是否該調,需對照回測『面向預測力』累積後判斷:高權重但低預測力→考慮降;低權重但高預測力→考慮升。"
